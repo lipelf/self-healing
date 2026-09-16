@@ -1,0 +1,25 @@
+[project]
+name = "selfheal"
+version = "0.1.0"
+description = "Self-healing de testes automatizados web por similaridade ponderada (Similo)"
+readme = "README.md"
+requires-python = ">=3.9"   # testado em 3.11, 3.13 e 3.14
+authors = [{ name = "Luiz Fellipe Rocha dos Santos" }]
+license = { text = "MIT" }
+dependencies = ["playwright>=1.40", "beautifulsoup4>=4.12"]
+
+[project.scripts]
+selfheal = "selfheal.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["selfheal*"]
+
+# O adaptador npm viaja dentro do pacote Python: assim 'pip install selfheal'
+# e a unica instalacao necessaria, e 'selfheal init' acopla o engine ao
+# projeto de testes sem que o usuario precise buscar o pacote no registro.
+[tool.setuptools.package-data]
+selfheal = ["adapter/*.tgz"]

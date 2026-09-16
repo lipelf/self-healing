@@ -1,0 +1,38 @@
+{
+  "name": "selfheal-playwright",
+  "version": "0.1.0",
+  "description": "Self-healing de seletores para testes Playwright: recupera o elemento por similaridade e corrige o codigo do teste",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "selfheal": "dist/init.js",
+    "selfheal-init": "dist/init.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "keywords": [
+    "playwright",
+    "testing",
+    "self-healing",
+    "e2e"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "engine",
+    "scripts",
+    "README.md"
+  ]
+}

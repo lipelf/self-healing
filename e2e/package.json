@@ -1,0 +1,13 @@
+{
+  "name": "shopdemo-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:report": "playwright test --reporter=list"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.44.1",
+    "typescript": "5.4.5"
+  },
+  "dependencies": {}
+}

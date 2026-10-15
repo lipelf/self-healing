@@ -2,5 +2,10 @@ node_modules/
 .next/
 __pycache__/
 *.egg-info/
-.selfheal/
+# A base de conhecimento e entrada, nao saida: sem ela, a ferramenta nao tem
+# com o que comparar e nao recupera nada. Versiona-la e o que permite o
+# self-healing funcionar em integracao continua, onde cada execucao parte de
+# uma maquina limpa. O resto de .selfheal/ e gerado a cada rodada.
+**/.selfheal/*
+!**/.selfheal/knowledge.json
 test-results/

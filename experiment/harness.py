@@ -150,10 +150,18 @@ def run_scenario(page, scenario: str, kb: KnowledgeBase,
     return results
 
 
-def summarize(results: List[dict], threshold: float = 0.60) -> dict:
-    """Metricas para um dado limiar, a partir do ranking ja registrado."""
+def summarize(results: List[dict], threshold: float = 0.50,
+              margin: float = 0.005) -> dict:
+    """Metricas para um dado par (limiar, margem), a partir do ranking.
+
+    Uma correcao so e aplicada quando a pontuacao supera o limiar E o
+    primeiro colocado se separa do segundo por pelo menos `margin`. Com
+    margin=0 o criterio equivale ao Similo original, o que permite medir o
+    efeito isolado da rejeicao por ambiguidade sobre os mesmos dados.
+    """
     broken = [r for r in results if r["broken"]]
-    healed = [r for r in broken if r["score"] >= threshold]
+    healed = [r for r in broken
+              if r["score"] >= threshold and r.get("margin", 1.0) >= margin]
     correct = [r for r in healed if r["top1_correct"]]
     return {
         "quebrados": len(broken),
@@ -167,19 +175,30 @@ def summarize(results: List[dict], threshold: float = 0.60) -> dict:
     }
 
 
-def sweep(results: List[dict], lo: float = 0.30, hi: float = 0.95,
-          step: float = 0.05) -> List[dict]:
-    """Varredura do limiar: base da etapa de calibracao."""
+def sweep(results: List[dict], lo: float = 0.30, hi: float = 0.80,
+          step: float = 0.05, margin: float = 0.0) -> List[dict]:
+    """Varredura do limiar, com a margem fixada: calibracao de tau."""
     rows, t = [], lo
     while t <= hi + 1e-9:
-        s = summarize(results, round(t, 2))
-        rows.append({"limiar": round(t, 2), **s})
+        s = summarize(results, round(t, 2), margin)
+        rows.append({"limiar": round(t, 2), "margem": margin, **s})
         t += step
     return rows
 
 
-def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.60,
-         densities=(4, 24)) -> dict:
+def sweep_margin(results: List[dict], threshold: float = 0.50,
+                 margins=(0.0, 0.005, 0.010, 0.020, 0.030, 0.050)) -> List[dict]:
+    """Varredura da margem, com o limiar fixado: calibracao de delta.
+
+    E esta varredura que quantifica o efeito da rejeicao por ambiguidade:
+    quanto de recuperacao se troca por quanto de precisao.
+    """
+    return [{"limiar": threshold, "margem": m, **summarize(results, threshold, m)}
+            for m in margins]
+
+
+def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.50,
+         margin: float = 0.005, densities=(4, 24)) -> dict:
     OUT.mkdir(exist_ok=True)
     all_results: List[dict] = []
 
@@ -197,7 +216,7 @@ def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.60,
             for scenario in scenarios:
                 results = run_scenario(page, scenario, kb, threshold, size)
                 all_results.extend(results)
-                s = summarize(results, threshold)
+                s = summarize(results, threshold, margin)
                 print(f"  {scenario.upper()}: quebrados={s['quebrados']} "
                       f"corrigidos={s['corrigidos']} corretos={s['corretos']} "
                       f"recuperacao={s['taxa_recuperacao']}% "
@@ -210,15 +229,17 @@ def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.60,
         rows = all_results
         for k, v in kw.items():
             rows = [r for r in rows if r.get(k) == v]
-        return summarize(rows, threshold)
+        return summarize(rows, threshold, margin)
 
     payload = {
         "threshold": threshold,
+        "margin": margin,
         "calibracao": sweep(all_results),
+        "calibracao_margem": sweep_margin(all_results, threshold),
         "calibracao_por_cenario": {
             s: sweep([r for r in all_results if r["scenario"] == s])
             for s in scenarios},
-        "global": summarize(all_results),
+        "global": summarize(all_results, threshold, margin),
         "por_densidade": {str(d): subset(catalog_size=d) for d in densities},
         "por_cenario": {s: subset(scenario=s) for s in scenarios},
         "por_cenario_densidade": {

@@ -80,6 +80,32 @@ execução ele é localizado nesta ordem:
 3. **Python do sistema**, quando já tem o engine instalado;
 4. se nada disso existir, a mensagem diz exatamente o que fazer.
 
+### Em integração contínua
+
+A base de conhecimento é **entrada, não saída**: sem ela a ferramenta não tem
+com o que comparar e não recupera nada. Como o runner de CI parte de uma
+máquina limpa a cada execução, `.selfheal/knowledge.json` precisa ser
+versionado — o `selfheal init` já ajusta o `.gitignore` para isso:
+
+```gitignore
+**/.selfheal/*
+!**/.selfheal/knowledge.json
+```
+
+Na prática, a base acompanha o código dos testes como um *snapshot*: quando um
+seletor é corrigido, a base muda junto e entra no mesmo commit.
+
+A execução em paralelo é suportada. Cada worker do Playwright roda o seu
+próprio engine, e a gravação da base é feita sob trava exclusiva, relendo o
+disco e fundindo antes de substituir o arquivo de forma atômica — de modo que
+o que um worker aprendeu não apague o que os outros aprenderam.
+
+Para CI, desligue a janela do navegador:
+
+```bash
+HEADLESS=1 npx playwright test
+```
+
 ### Tabela de resultados
 
 Depois da execução:

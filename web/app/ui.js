@@ -4,58 +4,58 @@
 // foram invalidados.
 export const E = {
   // ---- login -------------------------------------------------------------
-  loginEmail:      { id: 'login-email',      name: 'email',      className: 'field field-text' },
-  loginSenha:      { id: 'login-senha',      name: 'senha',      className: 'field field-text' },
-  loginMostrar:    { id: 'btn-mostrar-senha',name: 'mostrar',    className: 'btn btn-ghost' },
-  loginEntrar:     { id: 'btn-entrar',       name: 'entrar',     className: 'btn btn-primary' },
-  loginEsqueci:    { id: 'link-esqueci',     name: 'esqueci',    className: 'link link-muted' },
-  loginCriar:      { id: 'link-criar-conta', name: 'criar',      className: 'link link-muted' },
+  loginEmail:      { id: 'elxdjwv',      name: 'email',      className: 'field field-text' },
+  loginSenha:      { id: 'eh5lcxy',      name: 'senha',      className: 'field field-text' },
+  loginMostrar:    { id: 'e1kf6ll',name: 'mostrar',    className: 'btn btn-ghost' },
+  loginEntrar:     { id: 'e1vm4v1',       name: 'entrar',     className: 'btn btn-primary' },
+  loginEsqueci:    { id: 'e1jbe5x',     name: 'esqueci',    className: 'link link-muted' },
+  loginCriar:      { id: 'e1xl598', name: 'criar',      className: 'link link-muted' },
 
   // ---- catalogo ----------------------------------------------------------
-  catBusca:        { id: 'campo-busca',      name: 'busca',      className: 'field field-search' },
-  catFiltro:       { id: 'filtro-categoria', name: 'categoria',  className: 'field field-select' },
-  catOrdenar:      { id: 'ordenar-por',      name: 'ordem',      className: 'field field-select' },
-  catAdd1: { id: 'add-produto-1', name: 'add1', className: 'btn btn-add' },
-  catDet1: { id: 'detalhe-produto-1', name: 'det1', className: 'link link-detail' },
-  catAdd2: { id: 'add-produto-2', name: 'add2', className: 'btn btn-add' },
-  catDet2: { id: 'detalhe-produto-2', name: 'det2', className: 'link link-detail' },
-  catAdd3: { id: 'add-produto-3', name: 'add3', className: 'btn btn-add' },
-  catDet3: { id: 'detalhe-produto-3', name: 'det3', className: 'link link-detail' },
-  catAdd4: { id: 'add-produto-4', name: 'add4', className: 'btn btn-add' },
-  catDet4: { id: 'detalhe-produto-4', name: 'det4', className: 'link link-detail' },
-  catVerMais:      { id: 'btn-ver-mais',     name: 'vermais',    className: 'btn btn-secondary' },
+  catBusca:        { id: 'eql2sd2',      name: 'busca',      className: 'field field-search' },
+  catFiltro:       { id: 'ea1cwvl', name: 'categoria',  className: 'field field-select' },
+  catOrdenar:      { id: 'e1krzug',      name: 'ordem',      className: 'field field-select' },
+  catAdd1: { id: 'e1ciiox', name: 'add1', className: 'btn btn-add' },
+  catDet1: { id: 'e18taoo', name: 'det1', className: 'link link-detail' },
+  catAdd2: { id: 'e1c8j38', name: 'add2', className: 'btn btn-add' },
+  catDet2: { id: 'e18jb2z', name: 'det2', className: 'link link-detail' },
+  catAdd3: { id: 'e1byjhj', name: 'add3', className: 'btn btn-add' },
+  catDet3: { id: 'e189bha', name: 'det3', className: 'link link-detail' },
+  catAdd4: { id: 'e1dwgpe', name: 'add4', className: 'btn btn-add' },
+  catDet4: { id: 'e17zbvl', name: 'det4', className: 'link link-detail' },
+  catVerMais:      { id: 'e1qtag5',     name: 'vermais',    className: 'btn btn-secondary' },
 
   // ---- carrinho ----------------------------------------------------------
-  carMais1:        { id: 'aumentar-item-1',  name: 'mais1',      className: 'btn btn-qty' },
-  carMenos1:       { id: 'diminuir-item-1',  name: 'menos1',     className: 'btn btn-qty' },
-  carRemover1:     { id: 'remover-item-1',   name: 'rem1',       className: 'btn btn-danger' },
-  carMais2:        { id: 'aumentar-item-2',  name: 'mais2',      className: 'btn btn-qty' },
-  carMenos2:       { id: 'diminuir-item-2',  name: 'menos2',     className: 'btn btn-qty' },
-  carRemover2:     { id: 'remover-item-2',   name: 'rem2',       className: 'btn btn-danger' },
-  carCupom:        { id: 'campo-cupom',      name: 'cupom',      className: 'field field-text' },
-  carAplicar:      { id: 'btn-aplicar-cupom',name: 'aplicar',    className: 'btn btn-secondary' },
-  carContinuar:    { id: 'link-continuar',   name: 'continuar',  className: 'link link-muted' },
-  carFinalizar:    { id: 'btn-finalizar',    name: 'finalizar',  className: 'btn btn-primary' },
+  carMais1:        { id: 'e19f8em',  name: 'mais1',      className: 'btn btn-qty' },
+  carMenos1:       { id: 'e1phnjs',  name: 'menos1',     className: 'btn btn-qty' },
+  carRemover1:     { id: 'e1baj7p',   name: 'rem1',       className: 'btn btn-danger' },
+  carMais2:        { id: 'e1958sx',  name: 'mais2',      className: 'btn btn-qty' },
+  carMenos2:       { id: 'e1qbmcu',  name: 'menos2',     className: 'btn btn-qty' },
+  carRemover2:     { id: 'ehbq4s',   name: 'rem2',       className: 'btn btn-danger' },
+  carCupom:        { id: 'eticn0w',      name: 'cupom',      className: 'field field-text' },
+  carAplicar:      { id: 'e8sqjn',name: 'aplicar',    className: 'btn btn-secondary' },
+  carContinuar:    { id: 'eguwui1',   name: 'continuar',  className: 'link link-muted' },
+  carFinalizar:    { id: 'e17oqor',    name: 'finalizar',  className: 'btn btn-primary' },
 
   // ---- checkout ----------------------------------------------------------
-  ckNome:          { id: 'checkout-nome',    name: 'nome',       className: 'field field-text' },
-  ckCpf:           { id: 'checkout-cpf',     name: 'cpf',        className: 'field field-text' },
-  ckCep:           { id: 'checkout-cep',     name: 'cep',        className: 'field field-text' },
-  ckEndereco:      { id: 'checkout-endereco',name: 'endereco',   className: 'field field-text' },
-  ckCidade:        { id: 'checkout-cidade',  name: 'cidade',     className: 'field field-text' },
-  ckPagamento:     { id: 'checkout-pagamento',name: 'pagamento',  className: 'field field-select' },
-  ckParcelas:      { id: 'checkout-parcelas',name: 'parcelas',   className: 'field field-select' },
-  ckConfirmar:     { id: 'btn-confirmar',    name: 'confirmar',  className: 'btn btn-primary' },
+  ckNome:          { id: 'ef16eth',    name: 'nome',       className: 'field field-text' },
+  ckCpf:           { id: 'e83sqpf',     name: 'cpf',        className: 'field field-text' },
+  ckCep:           { id: 'eepg5g8',     name: 'cep',        className: 'field field-text' },
+  ckEndereco:      { id: 'e1r9a16',name: 'endereco',   className: 'field field-text' },
+  ckCidade:        { id: 'e1akyz7',  name: 'cidade',     className: 'field field-text' },
+  ckPagamento:     { id: 'e2gnds0',name: 'pagamento',  className: 'field field-select' },
+  ckParcelas:      { id: 'e1fdk71',name: 'parcelas',   className: 'field field-select' },
+  ckConfirmar:     { id: 'eldvsct',    name: 'confirmar',  className: 'btn btn-primary' },
 
   // ---- galeria: botoes de icone sem texto nem rotulo -------------------
-  thumb1:          { id: 'thumb-1',           name: '',           className: 'thumb thumb-item' },
-  thumb2:          { id: 'thumb-2',           name: '',           className: 'thumb thumb-item' },
-  thumb3:          { id: 'thumb-3',           name: '',           className: 'thumb thumb-item' },
-  thumb4:          { id: 'thumb-4',           name: '',           className: 'thumb thumb-item' },
-  thumb5:          { id: 'thumb-5',           name: '',           className: 'thumb thumb-item' },
-  thumb6:          { id: 'thumb-6',           name: '',           className: 'thumb thumb-item' },
-  thumb7:          { id: 'thumb-7',           name: '',           className: 'thumb thumb-item' },
-  thumb8:          { id: 'thumb-8',           name: '',           className: 'thumb thumb-item' },
+  thumb1:          { id: 'ect9w2p',           name: '',           className: 'thumb thumb-item' },
+  thumb2:          { id: 'ebzb2zs',           name: '',           className: 'thumb thumb-item' },
+  thumb3:          { id: 'ec9aoor',           name: '',           className: 'thumb thumb-item' },
+  thumb4:          { id: 'edn8p5m',           name: '',           className: 'thumb thumb-item' },
+  thumb5:          { id: 'edx8aul',           name: '',           className: 'thumb thumb-item' },
+  thumb6:          { id: 'ed39hro',           name: '',           className: 'thumb thumb-item' },
+  thumb7:          { id: 'edd93gn',           name: '',           className: 'thumb thumb-item' },
+  thumb8:          { id: 'eabdgty',           name: '',           className: 'thumb thumb-item' },
 };
 
 // Espalha os atributos do registro no elemento JSX.
@@ -78,4 +78,4 @@ export const REORDER = false;
 export const CATALOG_SIZE = 4;
 
 // Cenario ativo ('base', 'c1', 'c2', 'c3', 'c4').
-export const VARIANT = 'base';
+export const VARIANT = 'c1';

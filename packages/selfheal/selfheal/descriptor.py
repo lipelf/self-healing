@@ -1,12 +1,17 @@
-"""Descritor de elemento: as 11 propriedades comparadas pelo algoritmo Similo."""
+"""Descritor de elemento: as propriedades comparadas pelo algoritmo Similo.
+
+O conjunto foi enxugado em relacao ao Similo original: ficaram as quatro
+propriedades de carga semantica e duas estruturais. As geometricas
+(location, area, shape), a tag e o idxpath foram retiradas por serem
+instaveis entre versoes e redundantes com o xpath.
+"""
 from dataclasses import dataclass, asdict, field
 from typing import Any, Dict, Optional
 
 
 PROPERTIES = (
     "visible_text", "neighbor_text", "id", "name",
-    "tag", "class_", "xpath", "idxpath",
-    "location", "area", "shape",
+    "class_", "xpath",
 )
 
 # Pesos: propriedades com carga semantica sao mais estaveis entre versoes.
@@ -15,13 +20,8 @@ WEIGHTS: Dict[str, float] = {
     "neighbor_text": 1.5,
     "id": 1.5,
     "name": 1.5,
-    "tag": 0.5,
     "class_": 0.5,
     "xpath": 0.5,
-    "idxpath": 0.5,
-    "location": 0.5,
-    "area": 0.5,
-    "shape": 0.5,
 }
 
 
@@ -61,8 +61,6 @@ class ElementDescriptor:
         return (self.width / self.height) if self.height else 0.0
 
     def get(self, prop: str):
-        if prop in ("location", "area", "shape"):
-            return getattr(self, prop)
         return getattr(self, prop, "")
 
     def to_dict(self) -> Dict[str, Any]:

@@ -3,6 +3,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   timeout: 30000,
+  // Execucao sequencial apenas para a demonstracao, em que uma unica janela
+  // do navegador fica visivel. A ferramenta funciona em paralelo: a base de
+  // conhecimento e gravada sob trava e fundida entre os processos.
   fullyParallel: false,
   workers: 1,
   reporter: [['list'], ['selfheal-playwright/dist/reporter']],

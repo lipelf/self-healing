@@ -3,14 +3,13 @@
 Referencia: KLUGE, A.; STOCCO, A. Web element relocalization in evolving
 web applications: a comparative analysis and extension study. 2025.
 """
-from math import hypot
 from typing import Dict, List, Optional, Tuple
 
 from .descriptor import ElementDescriptor, WEIGHTS
 
 TEXT_PROPERTIES = (
     "visible_text", "neighbor_text", "id", "name",
-    "tag", "class_", "xpath", "idxpath",
+    "class_", "xpath",
 )
 
 
@@ -47,32 +46,10 @@ def text_similarity(a: str, b: str) -> float:
     return 1.0 - (levenshtein(a, b) / longest)
 
 
-def location_similarity(target: ElementDescriptor, candidate: ElementDescriptor) -> float:
-    """Distancia euclidiana normalizada pela diagonal da janela."""
-    diagonal = hypot(target.viewport_width or 1280.0, target.viewport_height or 720.0)
-    distance = hypot(candidate.x - target.x, candidate.y - target.y)
-    return max(0.0, 1.0 - (distance / diagonal)) if diagonal else 0.0
-
-
-def ratio_similarity(a: float, b: float) -> float:
-    """Razao entre o menor e o maior valor; usada para area e proporcao."""
-    if a <= 0 and b <= 0:
-        return 1.0
-    if a <= 0 or b <= 0:
-        return 0.0
-    return min(a, b) / max(a, b)
-
-
 def property_similarity(prop: str, target: ElementDescriptor,
                         candidate: ElementDescriptor) -> float:
     if prop in TEXT_PROPERTIES:
         return text_similarity(target.get(prop), candidate.get(prop))
-    if prop == "location":
-        return location_similarity(target, candidate)
-    if prop == "area":
-        return ratio_similarity(target.area, candidate.area)
-    if prop == "shape":
-        return ratio_similarity(target.shape, candidate.shape)
     raise ValueError(f"propriedade desconhecida: {prop}")
 
 

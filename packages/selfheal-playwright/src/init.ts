@@ -7,7 +7,7 @@
  * `npx playwright test`, exatamente como antes.
  */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { MENSAGEM_SEM_ENGINE, resolveEngine } from './engine-resolver';
 
@@ -70,6 +70,62 @@ function ajustarConfig(config: string, headless: boolean): string[] {
   return feito;
 }
 
+const GITIGNORE = [
+  '',
+  '# selfheal — a base de conhecimento e entrada, nao saida.',
+  '# Sem ela a ferramenta nao tem com o que comparar e nao recupera nada, de',
+  '# modo que versiona-la e o que permite o self-healing funcionar em',
+  '# integracao continua, onde cada execucao parte de uma maquina limpa.',
+  // O prefixo ** e necessario: um padrao com barra no meio fica ancorado na
+  // raiz do repositorio e nao cobriria .selfheal/ dentro da pasta de testes.
+  '**/.selfheal/*',
+  '!**/.selfheal/knowledge.json',
+  '',
+].join('\n');
+
+/** Garante que a base de conhecimento seja versionada, e o resto ignorado. */
+function ajustarGitignore(projeto: string): string | null {
+  // Procura o .gitignore do repositorio, que pode estar acima da pasta de
+  // testes quando ela e um subdiretorio do projeto.
+  let dir = projeto;
+  for (let i = 0; i < 4; i++) {
+    const caminho = join(dir, '.gitignore');
+    if (existsSync(caminho)) {
+      const texto = readFileSync(caminho, 'utf8');
+      if (texto.includes('!**/.selfheal/knowledge.json')) {
+        return 'base de conhecimento ja versionada (.gitignore)';
+      }
+      if (/^\.selfheal\/?\s*$/m.test(texto)) {
+        // Regra existente ignora a base inteira: abre excecao para ela.
+        writeFileSync(caminho,
+          texto.replace(/^\.selfheal\/?\s*$/m,
+                        '**/.selfheal/*\n!**/.selfheal/knowledge.json'),
+          'utf8');
+        return 'base de conhecimento passou a ser versionada (.gitignore)';
+      }
+      writeFileSync(caminho, texto.replace(/\n*$/, '\n') + GITIGNORE, 'utf8');
+      return 'base de conhecimento versionada (.gitignore)';
+    }
+    const pai = dirname(dir);
+    if (pai === dir) break;
+    dir = pai;
+  }
+
+  // Sem .gitignore: cria um, mas apenas onde ha um repositorio. Em um projeto
+  // que nao usa git o arquivo seria lixo, e a regra nao teria efeito algum.
+  let raiz = projeto;
+  for (let i = 0; i < 4; i++) {
+    if (existsSync(join(raiz, '.git'))) {
+      writeFileSync(join(raiz, '.gitignore'), GITIGNORE.replace(/^\n/, ''), 'utf8');
+      return 'base de conhecimento versionada (.gitignore criado)';
+    }
+    const pai = dirname(raiz);
+    if (pai === raiz) break;
+    raiz = pai;
+  }
+  return null;
+}
+
 function specsEm(dir: string, encontrados: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {
     if (nome === 'node_modules' || nome.startsWith('.')) continue;
@@ -124,6 +180,9 @@ function main() {
   } else {
     console.log(`  ${CINZA}nenhum import a ajustar${RESET}`);
   }
+
+  const git = ajustarGitignore(projeto);
+  if (git) console.log(`  ${VERDE}${git}${RESET}`);
 
   // Confirma que o engine sera encontrado na hora do teste. Descobrir isso
   // agora e melhor do que descobrir no meio da suite.

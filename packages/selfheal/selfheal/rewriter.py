@@ -6,7 +6,7 @@ alterado, de modo que o seletor obsoleto nao volte a falhar.
 """
 import re
 from pathlib import Path
-from typing import List, NamedTuple
+from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple
 
 
 class Rewrite(NamedTuple):
@@ -84,3 +84,165 @@ def build_selector(descriptor) -> str:
         first = descriptor.class_.split()[0]
         return f"{descriptor.tag}.{first}"
     return descriptor.tag
+
+
+# -- busca no projeto ------------------------------------------------------
+# Seletores nem sempre moram no arquivo .spec.ts. Times costumam centraliza-los
+# em classes auxiliares (Page Objects) ou em modulos de constantes. Sem varrer
+# o projeto, a correcao permanente so alcancaria o estilo mais simples.
+
+FONTES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
+IGNORADAS = {"node_modules", "dist", "build", ".git", ".next",
+             "coverage", "test-results", "playwright-report", ".selfheal",
+             ".venv", "venv", "__pycache__"}
+
+# Copias de seguranca nao devem ser reescritas: alterar um backup silenciosamente
+# destroi justamente o ponto de retorno do usuario.
+SUFIXOS_DE_BACKUP = (".orig", ".bak", ".backup", ".old")
+
+
+def _e_backup(parte: str) -> bool:
+    return parte.endswith(SUFIXOS_DE_BACKUP) or parte in {"backup", "backups"}
+
+
+def arquivos_de_codigo(raiz: str) -> Iterable[Path]:
+    """Arquivos-fonte do projeto, pulando diretorios gerados ou de terceiros."""
+    base = Path(raiz)
+    for caminho in base.rglob("*"):
+        if caminho.suffix not in FONTES or not caminho.is_file():
+            continue
+        if any(parte in IGNORADAS or _e_backup(parte) for parte in caminho.parts):
+            continue
+        yield caminho
+
+
+def localizar_no_projeto(raiz: str, selector: str,
+                         preferido: Optional[str] = None
+                         ) -> List[Tuple[str, int]]:
+    """Onde o seletor literal aparece no projeto, como pares arquivo e linha.
+
+    O arquivo indicado pelo teste vem primeiro quando tambem contem o seletor,
+    para que o caso comum continue sendo resolvido sem varredura desnecessaria.
+    """
+    achados: List[Tuple[str, int]] = []
+    if preferido:
+        try:
+            achados = [(preferido, n) for n in find_occurrences(preferido, selector)]
+        except OSError:
+            achados = []
+    if achados:
+        return achados
+
+    for caminho in arquivos_de_codigo(raiz):
+        if preferido and str(caminho) == str(preferido):
+            continue
+        try:
+            for n in find_occurrences(str(caminho), selector):
+                achados.append((str(caminho), n))
+        except (OSError, UnicodeDecodeError):
+            continue
+    return achados
+
+
+def reescrever_no_projeto(raiz: str, antigo: str, novo: str,
+                          preferido: Optional[str] = None,
+                          dry_run: bool = False) -> List[Rewrite]:
+    """Aplica a substituicao em todos os arquivos do projeto que a contenham."""
+    alterados: List[Rewrite] = []
+    vistos = set()
+    for arquivo, _linha in localizar_no_projeto(raiz, antigo, preferido):
+        if arquivo in vistos:
+            continue
+        vistos.add(arquivo)
+        alterados.extend(rewrite_selector(arquivo, antigo, novo, dry_run=dry_run))
+    return alterados
+
+
+# -- localizadores semanticos ----------------------------------------------
+# Chaves no formato "getByRole=button|Entrar" ou "getByTestId=salvar" descrevem
+# uma chamada do Playwright, e nao um seletor CSS. A reescrita precisa achar a
+# chamada no codigo e trocar o argumento textual, preservando o restante.
+
+CHAVE_SEMANTICA = re.compile(r"^(getBy[A-Za-z]+)=(.*)$", re.S)
+
+
+def partes_da_chave(chave: str):
+    """Devolve (metodo, papel, texto) ou None quando nao e chave semantica."""
+    m = CHAVE_SEMANTICA.match(chave)
+    if not m:
+        return None
+    metodo, resto = m.group(1), m.group(2)
+    if metodo == "getByRole":
+        papel, _, nome = resto.partition("|")
+        return metodo, papel, (nome or None)
+    return metodo, None, resto
+
+
+def _padrao_da_chamada(metodo: str, papel, texto):
+    """Expressao que casa a chamada e isola o argumento textual a trocar."""
+    if metodo == "getByRole":
+        if texto is None:
+            return None
+        return re.compile(
+            r"(getByRole\s*\(\s*(['\"`])" + re.escape(papel) + r"\2\s*,[^)]*?name\s*:\s*)"
+            r"(['\"`])" + re.escape(texto) + r"\3")
+    return re.compile(
+        r"(" + re.escape(metodo) + r"\s*\(\s*)(['\"`])" + re.escape(texto) + r"\2")
+
+
+def reescrever_semantico(path: str, chave: str, novo_texto: str,
+                         dry_run: bool = False) -> List[Rewrite]:
+    """Troca o argumento textual de uma chamada getBy* no arquivo."""
+    partes = partes_da_chave(chave)
+    if not partes:
+        return []
+    metodo, papel, texto = partes
+    padrao = _padrao_da_chamada(metodo, papel, texto)
+    if padrao is None:
+        return []
+
+    arquivo = Path(path)
+    linhas = arquivo.read_text(encoding="utf-8").splitlines(keepends=True)
+    mudancas: List[Rewrite] = []
+    for i, linha in enumerate(linhas):
+        if not padrao.search(linha):
+            continue
+        nova = padrao.sub(lambda m: f"{m.group(1)}{m.group(m.lastindex)}"
+                                    f"{novo_texto}{m.group(m.lastindex)}", linha)
+        mudancas.append(Rewrite(file=str(arquivo), line=i + 1,
+                                old_selector=chave, new_selector=novo_texto,
+                                old_line_text=linha.rstrip("\n"),
+                                new_line_text=nova.rstrip("\n")))
+        linhas[i] = nova
+
+    if mudancas and not dry_run:
+        arquivo.write_text("".join(linhas), encoding="utf-8")
+    return mudancas
+
+
+def localizar_semantico(raiz: str, chave: str,
+                        preferido: Optional[str] = None) -> List[Tuple[str, int]]:
+    """Onde a chamada getBy* correspondente a chave aparece no projeto."""
+    partes = partes_da_chave(chave)
+    if not partes:
+        return []
+    metodo, papel, texto = partes
+    padrao = _padrao_da_chamada(metodo, papel, texto)
+    if padrao is None:
+        return []
+
+    candidatos = ([Path(preferido)] if preferido else []) + \
+                 [c for c in arquivos_de_codigo(raiz)
+                  if not preferido or str(c) != str(preferido)]
+    achados: List[Tuple[str, int]] = []
+    for caminho in candidatos:
+        try:
+            texto_arquivo = Path(caminho).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for n, linha in enumerate(texto_arquivo.splitlines(), 1):
+            if padrao.search(linha):
+                achados.append((str(caminho), n))
+        if achados and preferido and str(caminho) == str(preferido):
+            return achados
+    return achados

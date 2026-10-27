@@ -68,7 +68,10 @@ export default class SelfHealReporter implements Reporter {
     if (fixes.length) {
       if (this.apply) {
         const res = await bridge.apply(
-          fixes.map((f) => ({ file: f.file, old: f.old, new: f.new })));
+          fixes.map((f) => ({ file: f.file, old: f.old, new: f.new,
+                              // texto do elemento escolhido: e o que
+                              // substitui o argumento de um getBy*
+                              text: f.element?.text })));
         applied = res?.applied || [];
       }
 

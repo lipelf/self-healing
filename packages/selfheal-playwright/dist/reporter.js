@@ -48,7 +48,10 @@ class SelfHealReporter {
         let applied = [];
         if (fixes.length) {
             if (this.apply) {
-                const res = await bridge.apply(fixes.map((f) => ({ file: f.file, old: f.old, new: f.new })));
+                const res = await bridge.apply(fixes.map((f) => ({ file: f.file, old: f.old, new: f.new,
+                    // texto do elemento escolhido: e o que
+                    // substitui o argumento de um getBy*
+                    text: f.element?.text })));
                 applied = res?.applied || [];
             }
             for (const f of fixes) {

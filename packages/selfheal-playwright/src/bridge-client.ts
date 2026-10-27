@@ -129,12 +129,14 @@ export class BridgeClient {
   }
 
   apply(fixes: { file: string; old: string; new: string }[]) {
-    return this.send({ cmd: 'apply', fixes });
+    // A raiz permite alcancar seletores declarados fora do .spec.ts, como em
+    // Page Objects. Sem ela o engine so procuraria no arquivo do teste.
+    return this.send({ cmd: 'apply', fixes, root: process.cwd() });
   }
 
   /** Onde cada seletor aparece na suite: usado nos que nao foram corrigidos. */
   locate(items: { file?: string; selector: string }[]) {
-    return this.send({ cmd: 'locate', items });
+    return this.send({ cmd: 'locate', items, root: process.cwd() });
   }
 
   /** Consolida a execucao em .selfheal/report.json. */

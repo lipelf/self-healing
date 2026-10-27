@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.INTERACTIVE = void 0;
 exports.collectCandidates = collectCandidates;
 exports.describeSelector = describeSelector;
+exports.describeLocator = describeLocator;
 /**
  * Coleta os atributos dos elementos interativos diretamente da pagina viva.
  *
@@ -110,6 +111,40 @@ async function describeSelector(page, selector) {
         return null;
     // boundingBox devolve a posicao relativa a area visivel; os candidatos
     // trazem a posicao absoluta no documento. A rolagem e a diferenca.
+    const scroll = await page.evaluate('[window.scrollX, window.scrollY]');
+    const alvoX = box.x + (scroll?.[0] || 0);
+    const alvoY = box.y + (scroll?.[1] || 0);
+    let melhor = null;
+    let menor = Infinity;
+    for (const c of candidates) {
+        const d = Math.abs(c.x - alvoX) + Math.abs(c.y - alvoY);
+        if (d < menor) {
+            menor = d;
+            melhor = c;
+        }
+    }
+    return menor <= 4 ? melhor : null;
+}
+/**
+ * Descreve o elemento de um Locator, e nao de uma string de seletor.
+ *
+ * Necessario para os localizadores semanticos (getByRole e afins), em que nao
+ * existe seletor CSS para passar a page.$(). A correspondencia com o candidato
+ * e feita pela posicao, do mesmo modo que em describeSelector.
+ */
+async function describeLocator(page, locator) {
+    let box = null;
+    try {
+        box = await locator.first().boundingBox({ timeout: 1000 });
+    }
+    catch {
+        return null;
+    }
+    if (!box)
+        return null;
+    const candidates = await collectCandidates(page);
+    if (!candidates.length)
+        return null;
     const scroll = await page.evaluate('[window.scrollX, window.scrollY]');
     const alvoX = box.x + (scroll?.[0] || 0);
     const alvoY = box.y + (scroll?.[1] || 0);

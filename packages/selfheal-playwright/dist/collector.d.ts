@@ -27,3 +27,11 @@ export interface Descriptor {
 export declare function collectCandidates(page: any): Promise<Descriptor[]>;
 /** Descritor de um unico elemento, casado pela sua posicao na pagina. */
 export declare function describeSelector(page: any, selector: string): Promise<Descriptor | null>;
+/**
+ * Descreve o elemento de um Locator, e nao de uma string de seletor.
+ *
+ * Necessario para os localizadores semanticos (getByRole e afins), em que nao
+ * existe seletor CSS para passar a page.$(). A correspondencia com o candidato
+ * e feita pela posicao, do mesmo modo que em describeSelector.
+ */
+export declare function describeLocator(page: any, locator: any): Promise<Descriptor | null>;

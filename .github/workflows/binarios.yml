@@ -1,0 +1,100 @@
+# Compila o engine num executavel standalone para cada plataforma.
+#
+# E o que sustenta a promessa de que o QA nao precisa de Python: o resolver do
+# adaptador procura bin/selfheal-engine-<plataforma>-<arquitetura>, e sem um
+# binario para a plataforma de destino ele cai no venv ou no Python do sistema.
+# Integracao continua roda em Linux, de modo que o binario linux-x64 e o mais
+# critico dos cinco.
+name: binarios do engine
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  compilar:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,   alvo: linux-x64    }
+          - { os: ubuntu-24.04-arm, alvo: linux-arm64 }
+          - { os: macos-13,        alvo: darwin-x64   }
+          - { os: macos-14,        alvo: darwin-arm64 }
+          - { os: windows-latest,  alvo: win32-x64    }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: instalar dependencias de compilacao
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: compilar o engine
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "packages/selfheal")
+          from selfheal.packager import build_binary, binary_name
+          caminho = build_binary(Path(".").resolve())
+          if caminho is None:
+              sys.exit("PyInstaller nao produziu o binario")
+          print("gerado:", caminho, "esperado:", binary_name())
+          PY
+
+      - name: conferir que o binario responde
+        shell: bash
+        run: |
+          bin=$(ls packages/selfheal-playwright/bin/selfheal-engine-*)
+          echo "testando $bin"
+          "$bin" --help > /dev/null
+          echo "ok"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-${{ matrix.alvo }}
+          path: packages/selfheal-playwright/bin/selfheal-engine-*
+          if-no-files-found: error
+
+  empacotar:
+    needs: compilar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Reune os cinco binarios num unico diretorio bin/ do pacote, de modo que
+      # um mesmo tarball sirva a qualquer plataforma.
+      - uses: actions/download-artifact@v4
+        with:
+          path: binarios
+      - name: reunir os binarios
+        run: |
+          mkdir -p packages/selfheal-playwright/bin
+          find binarios -type f -name 'selfheal-engine-*' \
+            -exec cp {} packages/selfheal-playwright/bin/ \;
+          chmod +x packages/selfheal-playwright/bin/* || true
+          ls -la packages/selfheal-playwright/bin/
+
+      - name: compilar o adaptador
+        working-directory: packages/selfheal-playwright
+        run: npm install && npx tsc
+
+      - name: gerar o tarball
+        working-directory: packages/selfheal-playwright
+        run: npm pack
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: selfheal-playwright-pacote
+          path: packages/selfheal-playwright/*.tgz
+          if-no-files-found: error

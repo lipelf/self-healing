@@ -22,6 +22,40 @@ const SELECTOR_METHODS = [
     'textContent', 'inputValue', 'getAttribute', 'isVisible', 'isEnabled',
     'isChecked', 'waitForSelector',
 ];
+// Acoes chamadas sobre um Locator, e nao sobre a page. Sao estas que precisam
+// ser envolvidas quando o teste usa localizadores semanticos.
+const LOCATOR_METHODS = [
+    'click', 'fill', 'type', 'press', 'check', 'uncheck', 'hover',
+    'selectOption', 'focus', 'tap', 'dblclick', 'setInputFiles',
+    'textContent', 'inputValue', 'getAttribute', 'isVisible', 'isEnabled',
+    'isChecked',
+];
+/**
+ * Chave canonica para um localizador semantico.
+ *
+ * O Locator devolvido pelo Playwright e usado tal e qual, preservando a
+ * semantica de correspondencia do framework. Esta chave serve apenas para
+ * indexar a base de conhecimento e para reencontrar a chamada no codigo-fonte
+ * na hora da reescrita. Quando os argumentos nao sao textos simples, por
+ * exemplo expressoes regulares, devolve-se null e o localizador segue sem
+ * acompanhamento, em vez de se registrar uma chave ambigua.
+ */
+const CHAVE_GETBY = {
+    getByTestId: (a) => (typeof a[0] === 'string' ? `getByTestId=${a[0]}` : null),
+    getByText: (a) => (typeof a[0] === 'string' ? `getByText=${a[0]}` : null),
+    getByLabel: (a) => (typeof a[0] === 'string' ? `getByLabel=${a[0]}` : null),
+    getByPlaceholder: (a) => (typeof a[0] === 'string' ? `getByPlaceholder=${a[0]}` : null),
+    getByAltText: (a) => (typeof a[0] === 'string' ? `getByAltText=${a[0]}` : null),
+    getByTitle: (a) => (typeof a[0] === 'string' ? `getByTitle=${a[0]}` : null),
+    getByRole: (a) => {
+        if (typeof a[0] !== 'string')
+            return null;
+        const nome = a[1]?.name;
+        if (nome === undefined)
+            return `getByRole=${a[0]}`;
+        return typeof nome === 'string' ? `getByRole=${a[0]}|${nome}` : null;
+    },
+};
 /**
  * Acrescenta um limite de espera a chamada, sem sobrescrever o que o usuario
  * tenha definido explicitamente.
@@ -80,6 +114,55 @@ exports.test = test_1.test.extend({
             learning.push(task);
             return task;
         };
+        /** Aprende a partir de um Locator, para os localizadores semanticos. */
+        const learnLocator = (chave, locator) => {
+            const task = (async () => {
+                try {
+                    const d = await (0, collector_1.describeLocator)(page, locator);
+                    if (d)
+                        await bridge.remember(chave, d);
+                }
+                catch { /* elemento ausente agora: nada a memorizar */ }
+            })();
+            learning.push(task);
+            return task;
+        };
+        /**
+         * Envolve um Locator semantico para que a falha de uma acao dispare a
+         * recuperacao. O Locator original e preservado: so quando ele falha por
+         * nao encontrar o elemento e que se tenta o substituto.
+         */
+        const wrapLocator = (locator, chave) => new Proxy(locator, {
+            get(alvo, prop, receptor) {
+                const original = Reflect.get(alvo, prop, receptor);
+                if (typeof original !== 'function')
+                    return original;
+                if (!LOCATOR_METHODS.includes(prop))
+                    return original.bind(alvo);
+                return async (...args) => {
+                    try {
+                        const r = await original.apply(alvo, withTimeout(args, limite));
+                        learnLocator(chave, alvo);
+                        return r;
+                    }
+                    catch (err) {
+                        if (!isNotFound(err))
+                            throw err;
+                        const novo = await recover(chave);
+                        if (!novo)
+                            return original.apply(alvo, args);
+                        if (selfheal?.autoRetry) {
+                            const substituto = page.locator(novo);
+                            const r = await substituto[prop](...args);
+                            seen.add(novo);
+                            learn(novo);
+                            return r;
+                        }
+                        throw err;
+                    }
+                };
+            },
+        });
         /** Tenta descobrir o substituto de um seletor que falhou. */
         const recover = async (selector) => {
             if (healed.has(selector))
@@ -112,6 +195,22 @@ exports.test = test_1.test.extend({
         const proxy = new Proxy(page, {
             get(target, prop, receiver) {
                 const original = Reflect.get(target, prop, receiver);
+                // Localizadores semanticos (getByRole, getByTestId e afins). O Locator
+                // do Playwright e devolvido intacto, apenas envolvido, de modo que a
+                // semantica de correspondencia do framework nao seja alterada.
+                if (CHAVE_GETBY[prop] && typeof original === 'function') {
+                    return (...args) => {
+                        const chave = CHAVE_GETBY[prop](args);
+                        if (!chave)
+                            return original.apply(target, args);
+                        seen.add(chave);
+                        const novo = healed.get(chave);
+                        if (novo)
+                            return target.locator(novo);
+                        learnLocator(chave, original.apply(target, args));
+                        return wrapLocator(original.apply(target, args), chave);
+                    };
+                }
                 // page.locator(sel) nao falha na criacao, so quando usado. Registra-se
                 // o seletor para que ele possa ser aprendido e, se quebrar, recuperado.
                 if (prop === 'locator' && typeof original === 'function') {

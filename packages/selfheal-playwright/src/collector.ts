@@ -123,3 +123,38 @@ export async function describeSelector(
   }
   return menor <= 4 ? melhor : null;
 }
+
+
+/**
+ * Descreve o elemento de um Locator, e nao de uma string de seletor.
+ *
+ * Necessario para os localizadores semanticos (getByRole e afins), em que nao
+ * existe seletor CSS para passar a page.$(). A correspondencia com o candidato
+ * e feita pela posicao, do mesmo modo que em describeSelector.
+ */
+export async function describeLocator(
+  page: any, locator: any,
+): Promise<Descriptor | null> {
+  let box: any = null;
+  try {
+    box = await locator.first().boundingBox({ timeout: 1000 });
+  } catch {
+    return null;
+  }
+  if (!box) return null;
+
+  const candidates = await collectCandidates(page);
+  if (!candidates.length) return null;
+
+  const scroll: number[] = await page.evaluate('[window.scrollX, window.scrollY]');
+  const alvoX = box.x + (scroll?.[0] || 0);
+  const alvoY = box.y + (scroll?.[1] || 0);
+
+  let melhor: Descriptor | null = null;
+  let menor = Infinity;
+  for (const c of candidates) {
+    const d = Math.abs(c.x - alvoX) + Math.abs(c.y - alvoY);
+    if (d < menor) { menor = d; melhor = c; }
+  }
+  return menor <= 4 ? melhor : null;
+}

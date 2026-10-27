@@ -13,6 +13,7 @@ da suite, evitando o custo de inicializacao a cada correcao.
     {"id": 3, "cmd": "apply", "fixes": [{"file": "...", "old": "...", "new": "..."}]}
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -20,7 +21,10 @@ from typing import Any, Dict, List
 
 from .descriptor import ElementDescriptor, WEIGHTS
 from .knowledge import KnowledgeBase
-from .rewriter import build_selector, find_occurrences, rewrite_selector
+from .rewriter import (build_selector, find_occurrences, rewrite_selector,
+                       localizar_no_projeto, reescrever_no_projeto,
+                       partes_da_chave, localizar_semantico,
+                       reescrever_semantico)
 from .similo import breakdown, rank_candidates
 
 DEFAULT_THRESHOLD = 0.50
@@ -102,19 +106,46 @@ class Bridge:
     def cmd_apply(self, req: Dict[str, Any]) -> Dict[str, Any]:
         """Reescreve os seletores nos arquivos de teste."""
         applied = []
+        raiz = req.get("root") or os.getcwd()
         for fix in req.get("fixes", []):
             arquivo, antigo, novo = fix["file"], fix["old"], fix["new"]
-            linhas = find_occurrences(arquivo, antigo)
-            if not linhas:
+            # O seletor pode nao morar no .spec.ts: Page Objects e modulos de
+            # constantes sao praxe. A varredura do projeto so acontece quando
+            # ele nao esta no arquivo de teste, mantendo barato o caso comum.
+            # Chaves de localizador semantico (getByRole e afins) nao sao
+            # seletores CSS: a correcao troca o texto do argumento na chamada,
+            # e nao uma string de seletor.
+            semantico = partes_da_chave(antigo) is not None
+            if semantico:
+                texto_novo = fix.get("text")
+                if not texto_novo:
+                    applied.append({"file": arquivo, "old": antigo,
+                                    "applied": False, "reason": "sem-texto-novo"})
+                    continue
+                ocorrencias = localizar_semantico(raiz, antigo, preferido=arquivo)
+            else:
+                ocorrencias = localizar_no_projeto(raiz, antigo, preferido=arquivo)
+
+            if not ocorrencias:
                 applied.append({"file": arquivo, "old": antigo,
                                 "applied": False, "reason": "nao-encontrado"})
                 continue
-            rewrite_selector(arquivo, antigo, novo)
+
+            if semantico:
+                alterados = []
+                for caminho in sorted({a for a, _ in ocorrencias}):
+                    alterados.extend(
+                        reescrever_semantico(caminho, antigo, fix["text"]))
+            else:
+                alterados = reescrever_no_projeto(raiz, antigo, novo,
+                                                  preferido=arquivo)
             descriptor = self.kb.get(antigo)
             if descriptor is not None:
                 self.kb.rename(antigo, novo, descriptor)
-            applied.append({"file": arquivo, "old": antigo, "new": novo,
-                            "line": linhas[0], "applied": True})
+            arquivo_real, linha = ocorrencias[0]
+            applied.append({"file": arquivo_real, "old": antigo, "new": novo,
+                            "line": linha, "applied": True,
+                            "arquivos": sorted({a.file for a in alterados})})
         self.kb.save()
         return {"ok": True, "applied": applied}
 
@@ -126,16 +157,17 @@ class Bridge:
         nao corrige, mas aponta exatamente onde a correcao manual e feita.
         """
         localizados = []
+        raiz = req.get("root") or os.getcwd()
         for item in req.get("items", []):
             arquivo, seletor = item.get("file"), item["selector"]
-            linhas: List[int] = []
-            if arquivo:
-                try:
-                    linhas = find_occurrences(arquivo, seletor)
-                except OSError:
-                    linhas = []
-            localizados.append({"file": arquivo, "selector": seletor,
-                                "lines": linhas})
+            ocorrencias = localizar_no_projeto(raiz, seletor, preferido=arquivo)
+            # Quando o seletor mora fora do .spec.ts, aponta-se o arquivo real,
+            # para que a correcao manual nao comece por uma caca ao seletor.
+            arquivo_real = ocorrencias[0][0] if ocorrencias else arquivo
+            localizados.append({"file": arquivo_real, "selector": seletor,
+                                "lines": [n for _a, n in ocorrencias],
+                                "ocorrencias": [{"file": a, "line": n}
+                                                for a, n in ocorrencias]})
         return {"ok": True, "located": localizados}
 
     # -- relatorio ---------------------------------------------------------

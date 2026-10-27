@@ -128,8 +128,9 @@ painel:
 
 restaurar:
 	@if [ -d e2e/tests.orig ]; then rm -rf e2e/tests && cp -r e2e/tests.orig e2e/tests; fi
+	@if [ -d e2e/pages.orig ]; then rm -rf e2e/pages && cp -r e2e/pages.orig e2e/pages; fi
 	cd web && node scripts/apply-variant.mjs base 4
-	@echo "interface e testes de volta ao estado original"
+	@echo "interface, testes e objetos de pagina de volta ao estado original"
 
 limpar: restaurar
 	rm -rf .selfheal e2e/test-results web/.next

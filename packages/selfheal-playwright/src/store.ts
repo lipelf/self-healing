@@ -1,9 +1,3 @@
-/**
- * Acumula as correcoes descobertas durante a execucao.
- *
- * Cada worker do Playwright roda em um processo separado, entao as correcoes
- * sao gravadas em disco e consolidadas pelo reporter ao final da suite.
- */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -18,6 +12,7 @@ export interface Fix {
   element?: Record<string, string>;
   breakdown?: Record<string, number>;
   duration_ms?: number;
+  rewrite_ms?: number;
 }
 
 export interface Miss {
@@ -57,7 +52,6 @@ function readAll<T>(path: string): T[] {
 }
 
 export function readFixes(): Fix[] {
-  // Um mesmo seletor pode quebrar em varios testes; corrige-se uma vez so.
   const seen = new Set<string>();
   return readAll<Fix>(FIXES).filter((f) => {
     const key = `${f.file}::${f.old}`;

@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * Gera app/ui.js a partir de app/ui.baseline.js aplicando um cenario de
- * mudanca de interface. Cada mutacao e deterministica, de modo que se saiba
- * exatamente quais seletores foram invalidados.
- *
- *   node scripts/apply-variant.mjs c1
- */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,19 +8,19 @@ const APP = join(here, '..', 'app');
 
 const camel = (s) => s.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
 
-// Identificadores opacos, no estilo do que CSS Modules e bibliotecas
-// CSS-in-JS geram a cada build. Reproduz o caso realista em que o rename
-// destroi completamente o valor anterior do atributo.
 const hash = (s) => {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36).slice(0, 6);
 };
+// Identificadores opacos, no estilo do que CSS Modules gera a cada build.
+// Converter para outra convencao de escrita preservaria parte da cadeia
+// original e transformaria o atributo renomeado em ancora, inflando a
+// recuperacao. Esta foi a ameaca a validade interna corrigida no TCC.
 const opaqueId = (v) => (v ? `e${hash(v)}` : v);
 const opaqueClass = (v) => v.split(' ').filter(Boolean).map((c) => `css-${hash(c)}`).join(' ');
 const opaqueName = (v) => (v ? `n${hash(v)}` : v);
 
-// Tokens de um "novo design system", simulando um redesign real.
 const CLASS_MAP = {
   'field field-text':   'ds-input ds-input--text',
   'field field-search': 'ds-input ds-input--search',
@@ -46,17 +39,12 @@ const CLASS_MAP = {
 const SCENARIOS = {
   base: { id: (v) => v, className: (v) => v, name: (v) => v,
           nested: false, reorder: false },
-  // C1 - renomeacao do atributo id
   c1: { id: opaqueId, className: (v) => v, name: (v) => v,
         nested: false, reorder: false },
-  // C2 - id renomeado, classes substituidas e elementos reposicionados
   c2: { id: opaqueId, className: opaqueClass, name: (v) => v,
         nested: false, reorder: false },
-  // C3 - alteracao simultanea de id, classes e name
   c3: { id: opaqueId, className: opaqueClass, name: opaqueName,
         nested: false, reorder: false },
-  // C4 - reestruturacao da hierarquia e reordenacao das listas,
-  //      restando apenas o texto como ancora semantica
   c4: { id: opaqueId, className: opaqueClass, name: opaqueName,
         nested: true, reorder: true },
 };
@@ -69,9 +57,8 @@ if (!rule) {
   process.exit(1);
 }
 
-let src = readFileSync(join(APP, 'ui.baseline.js'), 'utf8');
+let src = readFileSync(join(APP, 'ui.baseline.ts'), 'utf8');
 
-// Entradas do catalogo geradas conforme a densidade escolhida.
 const catalogEntries = [];
 for (let i = 1; i <= catalogSize; i++) {
   catalogEntries.push(
@@ -95,12 +82,9 @@ src = src.replace(/export const REORDER = (true|false);/,
 src = src.replace(/export const VARIANT = '[^']*';/,
                   `export const VARIANT = '${scenario}';`);
 
-writeFileSync(join(APP, 'ui.js'), src);
+writeFileSync(join(APP, 'ui.ts'), src);
 
-// Gabarito: para cada elemento, o seletor original e o seletor apos a mutacao.
-// E o que permite verificar objetivamente se a correcao apontou para o
-// elemento certo, sem depender de inspecao manual.
-let baseline = readFileSync(join(APP, 'ui.baseline.js'), 'utf8');
+let baseline = readFileSync(join(APP, 'ui.baseline.ts'), 'utf8');
 baseline = baseline.replace('/*__CATALOG__*/', catalogEntries.join('\n').trim());
 const entry = /(\w+):\s*\{ id: '([^']*)',\s*name: '([^']*)',\s*className: '([^']*)' \}/g;
 const map = {};

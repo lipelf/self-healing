@@ -1,13 +1,3 @@
-/**
- * Reporter que aplica as correcoes ao final da suite e resume o que mudou.
- *
- * A reescrita acontece uma unica vez, depois que todos os workers terminaram,
- * evitando que dois processos editem o mesmo arquivo simultaneamente.
- *
- * Tres responsabilidades: corrigir o que da para corrigir, apontar a linha
- * exata do que nao da, e consolidar a execucao em .selfheal/report.json —
- * arquivo que alimenta `selfheal report` e `selfheal table`.
- */
 import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
 import { basename } from 'node:path';
 import { existsSync } from 'node:fs';
@@ -25,7 +15,6 @@ export default class SelfHealReporter implements Reporter {
   private titulosComFalha = new Set<string>();
 
   constructor(options: { apply?: boolean; report?: string } = {}) {
-    // Por padrao corrige o codigo. Use { apply: false } para so sugerir.
     this.apply = options.apply !== false;
     this.reportPath = options.report || '.selfheal/report.json';
   }
@@ -44,8 +33,6 @@ export default class SelfHealReporter implements Reporter {
     const fixes = readFixes();
     const misses = readMisses();
 
-    // Uma execucao sem correcoes ainda interessa quando ha uma campanha em
-    // andamento: e ela que registra o desfecho — a suite voltou ao verde.
     const campanha = existsSync(this.reportPath);
     if (!fixes.length && !misses.length && !campanha) return;
 
@@ -69,8 +56,6 @@ export default class SelfHealReporter implements Reporter {
       if (this.apply) {
         const res = await bridge.apply(
           fixes.map((f) => ({ file: f.file, old: f.old, new: f.new,
-                              // texto do elemento escolhido: e o que
-                              // substitui o argumento de um getBy*
                               text: f.element?.text })));
         applied = res?.applied || [];
       }
@@ -78,6 +63,7 @@ export default class SelfHealReporter implements Reporter {
       for (const f of fixes) {
         const info = applied.find((a) => a.old === f.old);
         if (info?.line) f.line = info.line;
+        if (info?.rewrite_ms !== undefined) f.rewrite_ms = info.rewrite_ms;
         const local = f.line
           ? `${CINZA}${basename(f.file)}:${f.line}${RESET}`
           : '';
@@ -99,8 +85,6 @@ export default class SelfHealReporter implements Reporter {
     }
 
     if (misses.length) {
-      // A ferramenta se absteve. Ela nao corrige, mas aponta a linha exata:
-      // sem isso o tester teria de caçar o seletor pela suite inteira.
       const locais = await bridge.locate(
         misses.map((m) => ({ file: m.file, selector: m.old })));
       for (const m of misses) {
@@ -122,8 +106,6 @@ export default class SelfHealReporter implements Reporter {
       }
     }
 
-    // Consolida tudo em disco: e daqui que saem `selfheal report` e
-    // `selfheal table`. Sem esta etapa a execucao se perde ao terminar.
     const semHealing = new Set<string>(this.titulosComFalha);
     for (const f of fixes) if (f.test) semHealing.add(f.test);
     for (const m of misses) if (m.test) semHealing.add(m.test);
@@ -138,8 +120,6 @@ export default class SelfHealReporter implements Reporter {
         total: this.total,
         passed: this.total - this.falharam,
         failed: this.falharam,
-        // Quantos testes falhariam sem a ferramenta: os que ja falharam mais
-        // os que so passaram porque um seletor foi recuperado em tempo real.
         failed_without_healing: semHealing.size,
       },
     });

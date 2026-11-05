@@ -6,7 +6,7 @@ PYTHON := $(shell command -v python3.13 2>/dev/null || command -v python3)
 PIP := $(PYTHON) -m pip
 RUN := PYTHONPATH=packages/selfheal $(PYTHON)
 
-.PHONY: help checar setup deps dev test demo quebrar experimento relatorio painel restaurar limpar
+.PHONY: help checar setup deps dev test ui relatorio-e2e demo quebrar experimento experimento-11 tabelas relatorio painel restaurar limpar
 
 help:
 	@echo ""
@@ -17,9 +17,13 @@ help:
 	@echo "     make deps         instala so o que estiver faltando"
 	@echo "  2) make dev          sobe a aplicacao em http://localhost:3000"
 	@echo "  3) make test         roda a suite de testes na interface original"
+	@echo "     make ui           abre o modo interativo do Playwright"
+	@echo "     make relatorio-e2e  abre o relatorio da ultima execucao"
 	@echo "  4) make demo         quebra a interface e conserta sozinho  <-- a demonstracao"
 	@echo "     make quebrar      so aplica a mudanca de interface (CENARIO=c1..c4)"
 	@echo "  5) make experimento  roda os 4 cenarios e gera as metricas"
+	@echo "     make tabelas     imprime as tabelas do TCC em LaTeX"
+	@echo "     make experimento-11  repete com as 11 propriedades do Similo original"
 	@echo "  6) make relatorio    mostra o relatorio no terminal"
 	@echo "     make painel       abre o painel de revisao no navegador"
 	@echo "     make restaurar    volta tudo ao estado inicial (repetir a demo)"
@@ -77,9 +81,19 @@ dev: deps
 test: deps
 	cd e2e && npx playwright test
 
+# Modo interativo do Playwright: lista os testes, mostra cada passo, permite
+# voltar no tempo e reexecutar um teste isolado. Nao encerra sozinho.
+ui: deps
+	cd e2e && npx playwright test --ui
+
+# Relatorio navegavel da ultima execucao, com passos, capturas e rastro.
+relatorio-e2e:
+	cd e2e && npx playwright show-report
+
 # Demonstracao no formato real de uso: a suite roda normalmente e a
 # ferramenta corrige durante a execucao.
 demo: deps restaurar
+	@rm -f .selfheal/report.json e2e/.selfheal/report.json
 	@echo ""
 	@echo ">> 1/3 interface original — a ferramenta memoriza os elementos"
 	@echo "   (na primeira vez o Next precisa compilar o site; pode levar 1-2 min)"
@@ -120,6 +134,12 @@ demo-antiga:
 experimento:
 	$(RUN) experiment/harness.py
 
+experimento-11:
+	$(RUN) experiment/harness.py original
+
+tabelas:
+	@$(RUN) experiment/tabelas.py
+
 relatorio:
 	$(RUN) -m selfheal.cli report --report .selfheal/report.json
 
@@ -133,4 +153,5 @@ restaurar:
 	@echo "interface, testes e objetos de pagina de volta ao estado original"
 
 limpar: restaurar
-	rm -rf .selfheal e2e/test-results web/.next
+	rm -rf .selfheal e2e/.selfheal e2e/test-results web/.next
+	@echo "memoria, relatorios e cache de build apagados: pronto para ensaiar do zero"

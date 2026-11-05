@@ -86,18 +86,11 @@ def build_selector(descriptor) -> str:
     return descriptor.tag
 
 
-# -- busca no projeto ------------------------------------------------------
-# Seletores nem sempre moram no arquivo .spec.ts. Times costumam centraliza-los
-# em classes auxiliares (Page Objects) ou em modulos de constantes. Sem varrer
-# o projeto, a correcao permanente so alcancaria o estilo mais simples.
-
 FONTES = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs")
 IGNORADAS = {"node_modules", "dist", "build", ".git", ".next",
              "coverage", "test-results", "playwright-report", ".selfheal",
              ".venv", "venv", "__pycache__"}
 
-# Copias de seguranca nao devem ser reescritas: alterar um backup silenciosamente
-# destroi justamente o ponto de retorno do usuario.
 SUFIXOS_DE_BACKUP = (".orig", ".bak", ".backup", ".old")
 
 
@@ -157,11 +150,6 @@ def reescrever_no_projeto(raiz: str, antigo: str, novo: str,
         alterados.extend(rewrite_selector(arquivo, antigo, novo, dry_run=dry_run))
     return alterados
 
-
-# -- localizadores semanticos ----------------------------------------------
-# Chaves no formato "getByRole=button|Entrar" ou "getByTestId=salvar" descrevem
-# uma chamada do Playwright, e nao um seletor CSS. A reescrita precisa achar a
-# chamada no codigo e trocar o argumento textual, preservando o restante.
 
 CHAVE_SEMANTICA = re.compile(r"^(getBy[A-Za-z]+)=(.*)$", re.S)
 

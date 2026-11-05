@@ -94,8 +94,49 @@ exports.test = test_1.test.extend({
         const seen = new Set(); // seletores usados no teste
         const testFile = testInfo.file;
         const testName = testInfo.title;
-        /** Aprende o elemento sempre que ele e encontrado com sucesso. */
-        const learn = (selector) => {
+        /**
+         * Fotografa o elemento sem gravar nada ainda.
+         *
+         * Usada antes da acao: clicar ou preencher pode alterar o proprio
+         * elemento ou o texto a sua volta, e memorizar o estado posterior
+         * gravaria um caso transitorio que nao se repete na execucao seguinte,
+         * levando a recuperacao a casar com o elemento errado.
+         */
+        const fotografar = async (selector) => {
+            try {
+                return await (0, collector_1.describeSelector)(page, selector);
+            }
+            catch {
+                return null;
+            }
+        };
+        /** Grava na base o descritor ja obtido. */
+        const gravar = (selector, descritor) => {
+            if (!descritor)
+                return;
+            const task = (async () => {
+                try {
+                    await bridge.remember(selector, descritor);
+                }
+                catch (e) {
+                    if (process.env.SELFHEAL_DEBUG) {
+                        console.error(`[selfheal] erro ao gravar ${selector}: ${e}`);
+                    }
+                }
+            })();
+            learning.push(task);
+            return task;
+        };
+        /**
+         * Aprende o elemento apos uma acao bem-sucedida.
+         *
+         * Prefere o estado anterior a acao. So recorre ao estado posterior
+         * quando nao houve foto previa, o que acontece quando o elemento ainda
+         * nao existia no momento da chamada e so apareceu durante a espera.
+         */
+        const learn = (selector, previa) => {
+            if (previa)
+                return gravar(selector, previa);
             const task = (async () => {
                 try {
                     const d = await (0, collector_1.describeSelector)(page, selector);
@@ -140,9 +181,21 @@ exports.test = test_1.test.extend({
                 if (!LOCATOR_METHODS.includes(prop))
                     return original.bind(alvo);
                 return async (...args) => {
+                    // Mesmo cuidado dos seletores por texto: o estado de antes e o que
+                    // se repete na proxima execucao.
+                    let previa = null;
+                    try {
+                        previa = await (0, collector_1.describeLocator)(page, alvo);
+                    }
+                    catch {
+                        previa = null;
+                    }
                     try {
                         const r = await original.apply(alvo, withTimeout(args, limite));
-                        learnLocator(chave, alvo);
+                        if (previa)
+                            gravar(chave, previa);
+                        else
+                            learnLocator(chave, alvo);
                         return r;
                     }
                     catch (err) {
@@ -237,12 +290,15 @@ exports.test = test_1.test.extend({
                     const selector = args[0];
                     if (typeof selector !== 'string')
                         return original.apply(target, args);
+                    // Fotografa antes de agir, para nao memorizar o estado que a
+                    // propria acao produz.
+                    const previa = await fotografar(selector);
                     // Primeira tentativa com espera limitada, para que a recuperacao
                     // aconteca antes de o teste estourar o proprio timeout.
                     try {
                         const result = await original.apply(target, withTimeout(args, limite));
                         seen.add(selector);
-                        learn(selector);
+                        learn(selector, previa);
                         return result;
                     }
                     catch (err) {

@@ -20,9 +20,6 @@ from typing import Dict, Iterable, List, Optional, Set
 
 from .descriptor import ElementDescriptor
 
-# Tempo maximo de espera pela trava. Passado esse limite, considera-se que o
-# dono anterior morreu sem liberar e a trava e tomada: perder a sincronizacao
-# e menos grave do que travar a suite de testes de alguem.
 LOCK_TIMEOUT_S = 10.0
 LOCK_STALE_S = 30.0
 
@@ -49,7 +46,6 @@ class _FileLock:
                 return self
             except FileExistsError:
                 if self._abandonada() or time.monotonic() > limite:
-                    # Trava orfa ou espera esgotada: assume o controle.
                     try:
                         self.lock_path.unlink()
                     except OSError:
@@ -57,8 +53,6 @@ class _FileLock:
                     continue
                 time.sleep(0.02)
             except OSError:
-                # Sem permissao de escrita: segue sem trava, pois falhar aqui
-                # abortaria a suite por causa de um detalhe de infraestrutura.
                 return self
 
     def _abandonada(self) -> bool:
@@ -85,9 +79,6 @@ class KnowledgeBase:
     def __init__(self, path: str = ".selfheal/knowledge.json"):
         self.path = Path(path)
         self._data: Dict[str, dict] = {}
-        # Seletores removidos nesta sessao. Sem esse registro, a fusao
-        # ressuscitaria um seletor que acabou de ser corrigido, pois ele ainda
-        # consta do arquivo gravado por outro worker.
         self._removidos: Set[str] = set()
         self.load()
 
@@ -114,9 +105,6 @@ class KnowledgeBase:
             fundido = self._ler_disco()
             for selector in self._removidos:
                 fundido.pop(selector, None)
-            # O que esta em memoria e mais recente para os seletores que esta
-            # sessao viu; o que so existe em disco veio de outro worker e e
-            # preservado.
             fundido.update(self._data)
 
             destino = self.path.parent
@@ -127,14 +115,11 @@ class KnowledgeBase:
                 tmp.flush()
                 os.fsync(tmp.fileno())
                 temporario = tmp.name
-            # os.replace e atomico: um leitor concorrente ve o arquivo antigo
-            # ou o novo, nunca um arquivo pela metade.
             os.replace(temporario, self.path)
 
             self._data = fundido
             self._removidos.clear()
 
-    # -- operacoes ---------------------------------------------------------
     def record(self, selector: str, descriptor: ElementDescriptor) -> None:
         """Registra o elemento localizado com sucesso sob aquele seletor."""
         descriptor.selector = selector

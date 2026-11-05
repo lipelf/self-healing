@@ -3,15 +3,13 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   timeout: 30000,
-  // Execucao sequencial apenas para a demonstracao, em que uma unica janela
-  // do navegador fica visivel. A ferramenta funciona em paralelo: a base de
-  // conhecimento e gravada sob trava e fundida entre os processos.
   fullyParallel: false,
   workers: 1,
-  reporter: [['list'], ['selfheal-playwright/dist/reporter']],
+  reporter: [['list'],
+             ['html', { outputFolder: 'playwright-report', open: 'never' }],
+             ['selfheal-playwright/dist/reporter',
+              { report: '../.selfheal/report.json' }]],
 
-  // Sobe a aplicacao de demonstracao automaticamente, reaproveitando o
-  // servidor caso ele ja esteja rodando.
   webServer: {
     command: 'npm run dev',
     cwd: '../web',
@@ -20,22 +18,17 @@ export default defineConfig({
     timeout: 120000,
   },
 
-  // Chromium com janela visivel: a recuperacao do seletor acontece na tela,
-  // que e o que se quer mostrar na defesa. Em integracao continua, use
-  // HEADLESS=1 para voltar ao modo sem interface.
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
 
   use: {
     baseURL: 'http://127.0.0.1:3000',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
     headless: process.env.HEADLESS === '1',
     launchOptions: {
-      // Desacelera as acoes para que a quebra e a correcao sejam visiveis a
-      // olho nu. SELFHEAL_SLOWMO=0 executa na velocidade normal.
       slowMo: Number(process.env.SELFHEAL_SLOWMO ?? 150),
-      // Usa o Chromium que o proprio Playwright instala. A variavel de
-      // ambiente so e necessaria quando se quer apontar para outro binario.
       ...(process.env.CHROMIUM_PATH
         ? { executablePath: process.env.CHROMIUM_PATH }
         : {}),

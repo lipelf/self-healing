@@ -8,13 +8,25 @@ divergir silenciosamente.
     PYTHONPATH=packages/selfheal python3 experiment/tabelas.py
 """
 import json
+import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from harness import summarize
 
 ROOT = Path(__file__).resolve().parents[1]
 DADOS = ROOT / ".selfheal" / "experimento.json"
 
 ROTULOS = {"c1": "C1", "c2": "C2", "c3": "C3", "c4": "C4"}
+
+TIPOS = (
+    ("login", "Autenticação"),
+    ("ck", "Finalização de pedido"),
+    ("cat", "Catálogo de produtos"),
+    ("car", "Carrinho"),
+    ("thumb", "Miniaturas"),
+)
 
 
 def br(valor, casas=1, sufixo="\\%"):
@@ -22,35 +34,57 @@ def br(valor, casas=1, sufixo="\\%"):
     return f"{valor:.{casas}f}".replace(".", "{,}") + sufixo
 
 
-def tabela_calibracao(dados: dict) -> str:
+def moldura(colunas, cabecalho, corpo, legenda, rotulo,
+            fonte="Elaborado pelo autor"):
+    """Float no formato adotado no TCC.
+
+    A tabela e medida em um \\savebox e a legenda e a fonte ficam dentro de uma
+    minipage dessa mesma largura, de modo que ambas se alinhem a borda esquerda
+    do elemento, e nao a margem da pagina.
+    """
+    return (
+        "\\begin{table}[htbp]\n"
+        "\\centering\n"
+        "\\savebox{\\caixafig}{%\n"
+        "\\renewcommand{\\baselinestretch}{1}\\small\n"
+        f"\\begin{{tabular}}{{{colunas}}}\n"
+        "    \\hline\n"
+        f"    {cabecalho} \\\\\n"
+        "    \\hline\n"
+        f"{corpo}\n"
+        "    \\hline\n"
+        "    \\end{tabular}}%\n"
+        "\\begin{minipage}{\\wd\\caixafig}\n"
+        f"  \\caption{{{legenda}}}\n"
+        f"  \\label{{{rotulo}}}\n"
+        "  \\vspace{-0.25cm}\n"
+        "\n"
+        "  \\usebox{\\caixafig}\\\\[3pt]\n"
+        "  {\\renewcommand{\\baselinestretch}{1}\\footnotesize Fonte: "
+        f"{fonte}.}}\n"
+        "\\end{minipage}\n"
+        "\\end{table}"
+    )
+
+
+def tabela_calibracao(dados):
     linhas = []
     for r in dados.get("calibracao_margem", []):
         margem = r["margem"]
-        rotulo = "0 (Similo original)" if margem == 0 else br(margem, 3, "")
+        rotulo = "0 (sem rejeição)" if margem == 0 else br(margem, 3, "")
         linhas.append(
             f"    {rotulo:<19}& {br(r['taxa_recuperacao'])} & "
             f"{br(r['precisao'])} & {r['incorretos']} \\\\")
-    return """\\begin{table}[H]
-\\begin{center}
-\\caption{Efeito da margem de ambiguidade sobre recuperação e precisão}
-\\vspace{-0.2cm}
-    \\begin{center}
-    \\label{tab:calibracao}
-    \\begin{tabular}{c c c c}
-    \\hline
-    \\textbf{Margem $\\delta$} & \\textbf{Recuperação} & \\textbf{Precisão} & \\textbf{Correções incorretas} \\\\
-    \\hline
-""" + "\n".join(linhas) + """
-    \\hline
-    \\end{tabular}
-  \\end{center}
-\\end{center}
-\\vspace{-0.2cm}
-\\hspace{1cm}\\footnotesize Fonte: Elaborado pelo autor.
-\\end{table}"""
+    return moldura(
+        "c c c c",
+        "\\textbf{Margem $\\delta$} & \\textbf{Recuperação} & "
+        "\\textbf{Precisão} & \\textbf{Correções incorretas}",
+        "\n".join(linhas),
+        "Efeito da margem de ambiguidade sobre recuperação e precisão",
+        "tab:calibracao")
 
 
-def tabela_cenarios(dados: dict) -> str:
+def tabela_cenarios(dados):
     linhas = []
     for chave, rotulo in ROTULOS.items():
         m = dados["por_cenario"].get(chave)
@@ -58,33 +92,48 @@ def tabela_cenarios(dados: dict) -> str:
             continue
         linhas.append(
             f"    {rotulo:<7}& {m['quebrados']} & {m['corrigidos']} & "
-            f"{m['corretos']} & {br(m['taxa_recuperacao'])} & {br(m['precisao'])} \\\\")
+            f"{m['corretos']} & {br(m['taxa_recuperacao'])} & "
+            f"{br(m['precisao'])} \\\\")
     g = dados["global"]
-    global_ = (f"    Global & {g['quebrados']} & {g['corrigidos']} & "
-               f"{g['corretos']} & {br(g['taxa_recuperacao'])} & {br(g['precisao'])} \\\\")
-    return """\\begin{table}[H]
-\\begin{center}
-\\caption{Resultados detalhados do experimento por cenário}
-\\vspace{-0.2cm}
-    \\begin{center}
-    \\label{tab:resultados}
-    \\begin{tabular}{c c c c c c}
-    \\hline
-    \\textbf{Cenário} & \\textbf{Quebrados} & \\textbf{Corrigidos} & \\textbf{Corretos} & \\textbf{Recuperação} & \\textbf{Precisão} \\\\
-    \\hline
-""" + "\n".join(linhas) + """
-    \\hline
-""" + global_ + """
-    \\hline
-    \\end{tabular}
-  \\end{center}
-\\end{center}
-\\vspace{-0.2cm}
-\\hspace{1cm}\\footnotesize Fonte: Elaborado pelo autor.
-\\end{table}"""
+    linhas.append("    \\hline")
+    linhas.append(
+        f"    Global & {g['quebrados']} & {g['corrigidos']} & "
+        f"{g['corretos']} & {br(g['taxa_recuperacao'])} & "
+        f"{br(g['precisao'])} \\\\")
+    return moldura(
+        "c c c c c c",
+        "\\textbf{Cenário} & \\textbf{Quebr.} & \\textbf{Corrig.} & "
+        "\\textbf{Corretos} & \\textbf{Recup.} & \\textbf{Precisão}",
+        "\n".join(linhas),
+        "Resultados detalhados do experimento por cenário",
+        "tab:resultados")
 
 
-def coordenadas(dados: dict) -> str:
+def tabela_tipos(dados):
+    """Os mesmos casos reagrupados pela natureza do elemento procurado."""
+    limiar = dados.get("threshold", 0.50)
+    margem = dados.get("margin", 0.005)
+    linhas = []
+    for prefixo, rotulo in TIPOS:
+        casos = [r for r in dados["resultados"]
+                 if re.match(r"[a-z]+", r["key"]).group(0) == prefixo]
+        m = summarize(casos, limiar, margem)
+        if not m["quebrados"]:
+            continue
+        linhas.append(
+            f"    {rotulo:<21} & {m['quebrados']} & {m['corrigidos']} & "
+            f"{m['corretos']} & {br(m['taxa_recuperacao'])} & "
+            f"{br(m['precisao'])} \\\\")
+    return moldura(
+        "l c c c c c",
+        "\\textbf{Tipo de elemento} & \\textbf{Quebr.} & \\textbf{Corrig.} & "
+        "\\textbf{Corretos} & \\textbf{Recup.} & \\textbf{Precisão}",
+        "\n".join(linhas),
+        "Desempenho por tipo de elemento, somados os quatro cenários",
+        "tab:tipos")
+
+
+def coordenadas(dados):
     """As duas linhas de coordenadas do grafico de barras."""
     rec, pre = [], []
     for chave, rotulo in ROTULOS.items():
@@ -96,19 +145,22 @@ def coordenadas(dados: dict) -> str:
     g = dados["global"]
     rec.append(f"(Global,{g['taxa_recuperacao']})")
     pre.append(f"(Global,{g['precisao']})")
-    return (f"\\addplot+[fill=gray!55, draw=black] coordinates {{\n  "
+    return ("\\addplot+[fill=gray!55, draw=black] coordinates {\n  "
             + " ".join(rec) + "};\n\\addlegendentry{Taxa de recuperação}\n"
-            f"\\addplot+[fill=gray!20, draw=black] coordinates {{\n  "
+            "\\addplot+[fill=gray!20, draw=black] coordinates {\n  "
             + " ".join(pre) + "};\n\\addlegendentry{Precisão}")
 
 
-def texto_corrido(dados: dict) -> str:
+def texto_corrido(dados):
     """Os numeros que aparecem no corpo do texto, para conferencia."""
     g = dados["global"]
-    sem = next((r for r in dados.get("calibracao_margem", []) if r["margem"] == 0), None)
+    sem = next((r for r in dados.get("calibracao_margem", [])
+                if r["margem"] == 0), None)
     adotado = next((r for r in dados.get("calibracao_margem", [])
                     if abs(r["margem"] - dados.get("margin", 0.005)) < 1e-9), None)
+    props = dados.get("propriedades")
     linhas = [
+        f"propriedades comparadas .... {len(props) if props else 'nao registrado'}",
         f"limiar adotado ............. {dados.get('threshold')}",
         f"margem adotada ............. {dados.get('margin')}",
         f"quebrados .................. {g['quebrados']}",
@@ -135,35 +187,31 @@ def texto_corrido(dados: dict) -> str:
         ]
     for densidade, m in dados.get("por_densidade", {}).items():
         linhas.append(f"densidade {densidade:>2} ............... "
-                      f"recuperacao {m['taxa_recuperacao']}%  precisao {m['precisao']}%")
+                      f"recuperacao {m['taxa_recuperacao']}%  "
+                      f"precisao {m['precisao']}%")
     return "\n".join(linhas)
 
 
-def main() -> int:
+SECOES = (
+    ("NUMEROS DO TEXTO CORRIDO", texto_corrido),
+    ("TABELA — EFEITO DA MARGEM  (substitui tab:calibracao)", tabela_calibracao),
+    ("TABELA — POR CENARIO  (substitui tab:resultados)", tabela_cenarios),
+    ("TABELA — POR TIPO DE ELEMENTO  (substitui tab:tipos)", tabela_tipos),
+    ("GRAFICO — coordenadas para um \\addplot, se o grafico for incluido", coordenadas),
+)
+
+
+def main():
     if not DADOS.exists():
-        print(f"{DADOS} nao encontrado. Rode antes: python3 experiment/harness.py")
+        print(f"{DADOS} nao encontrado. Rode antes: make experimento")
         return 1
     dados = json.loads(DADOS.read_text(encoding="utf-8"))
-
-    print("=" * 74)
-    print("  NUMEROS DO TEXTO CORRIDO")
-    print("=" * 74)
-    print(texto_corrido(dados))
-    print()
-    print("=" * 74)
-    print("  TABELA — EFEITO DA MARGEM  (substitui tab:calibracao)")
-    print("=" * 74)
-    print(tabela_calibracao(dados))
-    print()
-    print("=" * 74)
-    print("  TABELA — POR CENARIO  (substitui tab:resultados)")
-    print("=" * 74)
-    print(tabela_cenarios(dados))
-    print()
-    print("=" * 74)
-    print("  GRAFICO — coordenadas  (substitui os dois \\addplot de fig:recuperacao)")
-    print("=" * 74)
-    print(coordenadas(dados))
+    for titulo, funcao in SECOES:
+        print("=" * 74)
+        print(f"  {titulo}")
+        print("=" * 74)
+        print(funcao(dados))
+        print()
     return 0
 
 

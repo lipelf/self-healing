@@ -63,8 +63,6 @@ def binary_name() -> str:
     return f"selfheal-engine-{sistema}-{arch}{ext}"
 
 
-# -- etapas ----------------------------------------------------------------
-
 def compile_adapter(repo: Path) -> None:
     if shutil.which("npm") is None:
         raise BuildError("npm nao encontrado no PATH. Instale o Node.js 18+.")
@@ -145,8 +143,6 @@ def pack_adapter(repo: Path, saida: Path) -> Path:
     nome = _run(["npm", "pack", "--silent"], pasta, "npm pack").splitlines()[-1]
     tgz = pasta / nome
 
-    # Copia para o pacote Python tambem: assim `selfheal init` continua
-    # funcionando para quem instalou o engine pelo pip.
     embutido = repo / "packages" / "selfheal" / "selfheal" / "adapter"
     shutil.rmtree(embutido, ignore_errors=True)
     embutido.mkdir(parents=True, exist_ok=True)

@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-/**
- * Provisiona o engine de decisao no momento da instalacao.
- *
- * O objetivo e que quem instala o pacote nao precise fazer nada a respeito de
- * Python. Se o pacote traz um binario para esta plataforma, nao ha o que
- * fazer. Caso contrario, cria-se um ambiente virtual dentro do proprio pacote
- * e instala-se ali o engine que veio junto, sem tocar no Python do sistema.
- *
- * Esta etapa nunca derruba a instalacao: se nada der certo, o pacote continua
- * instalado e a mensagem de erro aparece na primeira execucao da suite, que e
- * onde ela e util.
- */
 const { spawnSync } = require('node:child_process');
 const { existsSync, readdirSync } = require('node:fs');
 const { join } = require('node:path');
@@ -44,7 +32,6 @@ function achaPython() {
 }
 
 function main() {
-  // Durante o desenvolvimento do proprio pacote nao ha nada a provisionar.
   if (existsSync(join(RAIZ, 'src')) && !existsSync(join(RAIZ, 'engine'))) return;
 
   if (binarioDaPlataforma()) {
@@ -92,6 +79,5 @@ function main() {
 try {
   main();
 } catch (err) {
-  // Falhar aqui nao pode impedir a instalacao do pacote.
   log(`${AMAR}provisionamento ignorado: ${err.message}${RESET}`);
 }

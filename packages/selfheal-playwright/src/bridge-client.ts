@@ -1,10 +1,3 @@
-/**
- * Cliente do processo Python que decide as correcoes.
- *
- * O engine e mantido vivo durante toda a execucao da suite e conversa por
- * JSON, uma requisicao por linha. Manter um unico processo evita pagar a
- * inicializacao do Python a cada seletor quebrado.
- */
 import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
 import { Descriptor } from './collector';
 import { MENSAGEM_SEM_ENGINE, resolveEngine } from './engine-resolver';
@@ -40,8 +33,6 @@ export class BridgeClient {
   private ensure(): ChildProcessWithoutNullStreams {
     if (this.proc) return this.proc;
 
-    // O engine pode vir de um binario embutido, de um ambiente provisionado
-    // na instalacao ou do Python do sistema — nesta ordem de preferencia.
     const engine = resolveEngine(this.opts.python);
     if (!engine) {
       console.error(MENSAGEM_SEM_ENGINE);
@@ -72,12 +63,10 @@ export class BridgeClient {
           const msg = JSON.parse(line);
           const resolve = this.pending.get(msg.id);
           if (resolve) { this.pending.delete(msg.id); resolve(msg); }
-        } catch { /* linha malformada e ignorada */ }
+        } catch {}
       }
     });
 
-    // Erros do engine precisam ser visiveis: sem isso, uma falha de import
-    // no Python vira silencio e a base de conhecimento fica vazia sem aviso.
     this.proc.stderr.on('data', (chunk: Buffer) => {
       const txt = chunk.toString().trim();
       if (txt) console.error(`[selfheal:engine] ${txt}`);
@@ -129,17 +118,13 @@ export class BridgeClient {
   }
 
   apply(fixes: { file: string; old: string; new: string }[]) {
-    // A raiz permite alcancar seletores declarados fora do .spec.ts, como em
-    // Page Objects. Sem ela o engine so procuraria no arquivo do teste.
     return this.send({ cmd: 'apply', fixes, root: process.cwd() });
   }
 
-  /** Onde cada seletor aparece na suite: usado nos que nao foram corrigidos. */
   locate(items: { file?: string; selector: string }[]) {
     return this.send({ cmd: 'locate', items, root: process.cwd() });
   }
 
-  /** Consolida a execucao em .selfheal/report.json. */
   report(payload: { fixes: any[]; misses: any[]; suite?: any; path?: string }) {
     return this.send({ cmd: 'report', ...payload });
   }
@@ -152,7 +137,6 @@ export class BridgeClient {
   }
 }
 
-/** Uma unica ponte por processo de teste. */
 let shared: BridgeClient | null = null;
 export function getBridge(opts?: BridgeOptions): BridgeClient {
   if (!shared) shared = new BridgeClient(opts);

@@ -14,7 +14,6 @@ PROPERTIES = (
     "class_", "xpath",
 )
 
-# Pesos: propriedades com carga semantica sao mais estaveis entre versoes.
 WEIGHTS: Dict[str, float] = {
     "visible_text": 1.5,
     "neighbor_text": 1.5,
@@ -46,7 +45,6 @@ class ElementDescriptor:
     selector: str = ""
     meta: Dict[str, Any] = field(default_factory=dict)
 
-    # -- propriedades derivadas -------------------------------------------
     @property
     def location(self):
         return (self.x, self.y)
@@ -74,3 +72,13 @@ class ElementDescriptor:
     def __repr__(self) -> str:  # pragma: no cover - conveniencia
         label = self.visible_text or self.id or self.name or self.tag
         return f"<Element {self.tag} '{label[:30]}' selector={self.selector!r}>"
+
+
+# Vetor de onze propriedades do Similo original. Nao e usado pelo engine:
+# existe para que a comparacao 11 x 6 relatada no TCC seja reexecutavel
+# (experiment/harness.py original).
+PESOS_SIMILO_ORIGINAL: Dict[str, float] = {
+    "visible_text": 1.5, "neighbor_text": 1.5, "id": 1.5, "name": 1.5,
+    "tag": 0.5, "class_": 0.5, "xpath": 0.5, "idxpath": 0.5,
+    "location": 0.5, "area": 0.5, "shape": 0.5,
+}

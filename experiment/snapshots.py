@@ -24,7 +24,6 @@ WEB = ROOT / "web"
 SHOTS = ROOT / "shots"
 BASE_URL = "http://127.0.0.1:3000"
 
-# Trecho: (arquivo, rotulo, legenda, primeira linha, ultima linha)
 TRECHOS = [
     ("packages/selfheal/selfheal/descriptor.py",
      "descriptor.py — as 11 propriedades comparadas e seus pesos",
@@ -89,7 +88,6 @@ code { font-family: 'SF Mono', Menlo, monospace; font-size: 13.5px; line-height:
 def realcar(linha: str, python: bool) -> str:
     """Realce sintatico simples, suficiente para figura de trabalho."""
     escapada = html.escape(linha)
-    # Comentario e string primeiro: o que esta dentro deles nao e palavra-chave.
     if python and re.match(r"\s*#", escapada):
         return f'<span class="cm">{escapada}</span>'
     if not python and re.match(r"\s*(//|\*|/\*)", escapada):
@@ -137,8 +135,6 @@ def capturar_codigo(page) -> int:
         print(f"    {nome}")
     return len(TRECHOS)
 
-
-# -- variantes da interface -----------------------------------------------
 
 REGIOES = {"login": ("/login", "main")}
 CENARIOS = ["base", "c1", "c2", "c3", "c4"]

@@ -27,8 +27,6 @@ class InitError(RuntimeError):
     """Falha de acoplamento com uma explicacao ja pronta para o usuario."""
 
 
-# -- descoberta -----------------------------------------------------------
-
 def find_project(start: Optional[str] = None) -> Path:
     """Localiza a pasta do projeto Playwright.
 
@@ -87,8 +85,6 @@ def find_adapter() -> Optional[Path]:
     return None
 
 
-# -- etapas do acoplamento -------------------------------------------------
-
 def install_adapter(project: Path, adapter: Optional[Path]) -> str:
     """Instala o adaptador no projeto de testes."""
     if shutil.which("npm") is None:
@@ -126,8 +122,6 @@ def patch_config(config: Path, headless: bool = False,
                      f"{REPORTER_ENTRY}],", src, count=1)
         mudancas.append("reporter registrado")
 
-    # Chromium com janela: e o modo em que a recuperacao do seletor pode ser
-    # acompanhada na tela. headless continua disponivel por variavel.
     valor = "process.env.HEADLESS === '1'" if not headless else "true"
     if re.search(r"headless\s*:", src):
         mudancas.append("headless ja estava definido — nao foi alterado")

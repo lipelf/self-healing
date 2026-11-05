@@ -29,7 +29,6 @@ class SelfHealEngine:
         self.mode = mode
         self.weights = weights or WEIGHTS
 
-    # -- passo 1: aprender -------------------------------------------------
     def record_page(self, page, selectors: List[str]) -> int:
         """Registra os descritores dos seletores que ainda funcionam."""
         candidates = collect_from_page(page)
@@ -55,7 +54,6 @@ class SelfHealEngine:
                 return candidate
         return None
 
-    # -- passo 2-5: recuperar ---------------------------------------------
     def heal(self, page, broken_selector: str,
              test_file: Optional[str] = None) -> HealRecord:
         """Tenta reposicionar o elemento e, no modo auto-fix, corrige o codigo."""
@@ -109,7 +107,6 @@ class SelfHealEngine:
         self.report.add(record)
         return record
 
-    # -- api de conveniencia ----------------------------------------------
     def locate_or_heal(self, page, selector: str,
                        test_file: Optional[str] = None) -> Tuple[str, Optional[HealRecord]]:
         """Devolve um seletor utilizavel, recuperando-o se necessario."""

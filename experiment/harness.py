@@ -13,7 +13,7 @@ from typing import Dict, List
 
 from playwright.sync_api import sync_playwright
 
-from selfheal.descriptor import WEIGHTS
+from selfheal.descriptor import WEIGHTS, PESOS_SIMILO_ORIGINAL
 from selfheal.extractor import collect_from_page
 from selfheal.knowledge import KnowledgeBase
 from selfheal.similo import locate, rank_candidates
@@ -31,7 +31,6 @@ PAGES = {
     "galeria": "/galeria",
 }
 
-# Em qual pagina vive cada elemento do registro.
 PAGE_OF_PREFIX = {"login": "login", "cat": "catalogo", "car": "carrinho",
                   "ck": "checkout", "thumb": "galeria"}
 
@@ -43,10 +42,41 @@ def page_for(key: str) -> str:
     raise ValueError(key)
 
 
+CENARIO_ATUAL = {"nome": "base"}
+
+
 def apply_variant(scenario: str, catalog_size: int = 4) -> dict:
     subprocess.run(["node", "scripts/apply-variant.mjs", scenario, str(catalog_size)],
                    cwd=WEB, check=True, capture_output=True)
+    CENARIO_ATUAL["nome"] = scenario
     return json.loads((OUT / "variant-map.json").read_text(encoding="utf-8"))
+
+
+CREDENCIAL_DEMO = {"email": "luiz@unesc.net"}
+
+CARRINHO_DEMO = [
+    {"nome": "Teclado mecanico", "marca": "Keychron", "preco": 349.90, "qtd": 1},
+    {"nome": "Mouse sem fio", "marca": "Logitech", "preco": 129.90, "qtd": 1},
+]
+
+
+def abrir_sessao(page) -> None:
+    """Garante sessao e carrinho semeados em toda navegacao.
+
+    Semeia via add_init_script em vez de preencher o formulario de login: os
+    campos do formulario sao justamente os que a mutacao renomeia, de modo que
+    autenticar pela interface falharia nos cenarios C1 a C4 e o experimento
+    nunca chegaria as paginas internas.
+    """
+    estado = (
+        "try {"
+        f"  sessionStorage.setItem('shopdemo:sessao', {json.dumps(json.dumps(CREDENCIAL_DEMO))});"
+        f"  sessionStorage.setItem('shopdemo:carrinho', {json.dumps(json.dumps(CARRINHO_DEMO))});"
+        "} catch (e) {}"
+    )
+    page.add_init_script(estado)
+    page.goto(BASE_URL + "/login", wait_until="domcontentloaded", timeout=60000)
+    page.evaluate(f"() => {{ {estado} }}")
 
 
 def goto(page, path: str, expect_id: str = "", retries: int = 8) -> None:
@@ -60,6 +90,10 @@ def goto(page, path: str, expect_id: str = "", retries: int = 8) -> None:
             page.goto(BASE_URL + path + f"?v={time.time()}",
                       wait_until="networkidle", timeout=60000)
             page.wait_for_selector("main", timeout=30000)
+            servido = page.get_attribute("body", "data-variante")
+            if servido != CENARIO_ATUAL["nome"]:
+                raise RuntimeError(
+                    f"servindo '{servido}', esperado '{CENARIO_ATUAL['nome']}'")
             if not expect_id:
                 return
             if page.query_selector(f"#{expect_id}") is not None:
@@ -68,7 +102,24 @@ def goto(page, path: str, expect_id: str = "", retries: int = 8) -> None:
             if attempt == retries - 1:
                 raise
         time.sleep(1.5)
-    raise RuntimeError(f"variante nao aplicada em {path}: #{expect_id} ausente")
+    raise RuntimeError(
+        f"variante '{CENARIO_ATUAL['nome']}' nao aplicada em {path}: "
+        f"#{expect_id} ausente")
+
+
+def revelar_catalogo(page) -> None:
+    """Carrega todas as paginas do catalogo antes de medir.
+
+    A vitrine pagina em doze produtos. Sem revelar o restante, a densidade de
+    24 produtos nunca chegaria a ser exercida, e as duas condicoes do
+    experimento acabariam quase iguais.
+    """
+    for _ in range(6):
+        ver_mais = page.query_selector("button:has-text('Ver mais produtos')")
+        if ver_mais is None or not ver_mais.is_visible():
+            return
+        ver_mais.click()
+        page.wait_for_timeout(300)
 
 
 def first_id_on(elements: dict, page_name: str, field: str) -> str:
@@ -84,6 +135,8 @@ def record_baseline(page, elements: Dict[str, dict], kb: KnowledgeBase) -> int:
     stored = 0
     for page_name, path in PAGES.items():
         goto(page, path, first_id_on(elements, page_name, "baseline"))
+        if page_name == "catalogo":
+            revelar_catalogo(page)
         candidates = collect_from_page(page)
         by_id = {c.id: c for c in candidates if c.id}
         for key, info in elements.items():
@@ -98,7 +151,8 @@ def record_baseline(page, elements: Dict[str, dict], kb: KnowledgeBase) -> int:
 
 
 def run_scenario(page, scenario: str, kb: KnowledgeBase,
-                 threshold: float = 0.60, catalog_size: int = 4) -> List[dict]:
+                 threshold: float = 0.60, catalog_size: int = 4,
+                 weights: Dict[str, float] = WEIGHTS) -> List[dict]:
     """Aplica o cenario e tenta recuperar cada seletor invalidado."""
     variant = apply_variant(scenario, catalog_size)
     elements = variant["elements"]
@@ -106,6 +160,8 @@ def run_scenario(page, scenario: str, kb: KnowledgeBase,
 
     for page_name, path in PAGES.items():
         goto(page, path, first_id_on(elements, page_name, "mutated"))
+        if page_name == "catalogo":
+            revelar_catalogo(page)
         candidates = collect_from_page(page)
         by_id = {c.id: c for c in candidates if c.id}
 
@@ -129,7 +185,7 @@ def run_scenario(page, scenario: str, kb: KnowledgeBase,
                 continue
 
             started = time.perf_counter()
-            ranked = rank_candidates(target, candidates, WEIGHTS)
+            ranked = rank_candidates(target, candidates, weights)
             elapsed = (time.perf_counter() - started) * 1000
             best, score = ranked[0] if ranked else (None, 0.0)
             runner_up = ranked[1][1] if len(ranked) > 1 else 0.0
@@ -198,13 +254,16 @@ def sweep_margin(results: List[dict], threshold: float = 0.50,
 
 
 def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.50,
-         margin: float = 0.005, densities=(4, 24)) -> dict:
+         margin: float = 0.005, densities=(4, 24),
+         weights: Dict[str, float] = WEIGHTS,
+         saida: str = "experimento.json") -> dict:
     OUT.mkdir(exist_ok=True)
     all_results: List[dict] = []
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 720})
+        abrir_sessao(page)
 
         for size in densities:
             print(f"\n### densidade: catalogo com {size} produtos ###")
@@ -214,7 +273,7 @@ def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.50,
             print(f"linha de base: {stored} elementos registrados\n")
 
             for scenario in scenarios:
-                results = run_scenario(page, scenario, kb, threshold, size)
+                results = run_scenario(page, scenario, kb, threshold, size, weights)
                 all_results.extend(results)
                 s = summarize(results, threshold, margin)
                 print(f"  {scenario.upper()}: quebrados={s['quebrados']} "
@@ -234,6 +293,7 @@ def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.50,
     payload = {
         "threshold": threshold,
         "margin": margin,
+        "propriedades": sorted(weights),
         "calibracao": sweep(all_results),
         "calibracao_margem": sweep_margin(all_results, threshold),
         "calibracao_por_cenario": {
@@ -247,13 +307,23 @@ def main(scenarios=("c1", "c2", "c3", "c4"), threshold: float = 0.50,
             for d in densities for s in scenarios},
         "resultados": all_results,
     }
-    (OUT / "experimento.json").write_text(
+    (OUT / saida).write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return payload
 
 
 if __name__ == "__main__":
-    result = main()
+    import sys
+
+    # --pesos original reexecuta o experimento com as onze propriedades do
+    # Similo original, para reproduzir a comparacao 11 x 6 relatada no TCC.
+    # O resultado vai para outro arquivo, de modo que experimento.json, que
+    # alimenta as tabelas do artigo, nao seja sobrescrito.
+    original = "original" in sys.argv
+    result = main(weights=PESOS_SIMILO_ORIGINAL if original else WEIGHTS,
+                  saida="experimento-11-propriedades.json" if original
+                        else "experimento.json")
+    print(f"propriedades comparadas: {len(result['propriedades'])}")
     g = result["global"]
     print("=" * 60)
     print(f"GLOBAL  recuperacao={g['taxa_recuperacao']}%  precisao={g['precisao']}%  "

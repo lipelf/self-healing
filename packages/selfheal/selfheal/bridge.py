@@ -40,7 +40,6 @@ class Bridge:
         self.margin = margin
         self.fixes: List[Dict[str, Any]] = []
 
-    # -- aprender ----------------------------------------------------------
     def cmd_remember(self, req: Dict[str, Any]) -> Dict[str, Any]:
         """Guarda o descritor de um elemento localizado com sucesso."""
         descriptor = ElementDescriptor.from_dict(req["descriptor"])
@@ -58,7 +57,6 @@ class Bridge:
         self.kb.save()
         return {"ok": True, "stored": len(self.kb)}
 
-    # -- recuperar ---------------------------------------------------------
     def cmd_heal(self, req: Dict[str, Any]) -> Dict[str, Any]:
         """Escolhe, entre os candidatos enviados, o substituto do seletor."""
         started = time.perf_counter()
@@ -102,19 +100,17 @@ class Bridge:
             "duration_ms": round(elapsed, 2),
         }
 
-    # -- corrigir o codigo -------------------------------------------------
     def cmd_apply(self, req: Dict[str, Any]) -> Dict[str, Any]:
-        """Reescreve os seletores nos arquivos de teste."""
+        """Reescreve os seletores nos arquivos-fonte do projeto.
+
+        O tempo de cada reescrita e medido e devolvido, de modo que o custo da
+        correcao permanente possa ser comparado ao da decisao por similaridade.
+        """
         applied = []
         raiz = req.get("root") or os.getcwd()
         for fix in req.get("fixes", []):
+            inicio = time.perf_counter()
             arquivo, antigo, novo = fix["file"], fix["old"], fix["new"]
-            # O seletor pode nao morar no .spec.ts: Page Objects e modulos de
-            # constantes sao praxe. A varredura do projeto so acontece quando
-            # ele nao esta no arquivo de teste, mantendo barato o caso comum.
-            # Chaves de localizador semantico (getByRole e afins) nao sao
-            # seletores CSS: a correcao troca o texto do argumento na chamada,
-            # e nao uma string de seletor.
             semantico = partes_da_chave(antigo) is not None
             if semantico:
                 texto_novo = fix.get("text")
@@ -145,11 +141,12 @@ class Bridge:
             arquivo_real, linha = ocorrencias[0]
             applied.append({"file": arquivo_real, "old": antigo, "new": novo,
                             "line": linha, "applied": True,
-                            "arquivos": sorted({a.file for a in alterados})})
+                            "arquivos": sorted({a.file for a in alterados}),
+                            "rewrite_ms": round(
+                                (time.perf_counter() - inicio) * 1000, 3)})
         self.kb.save()
         return {"ok": True, "applied": applied}
 
-    # -- localizar no codigo -----------------------------------------------
     def cmd_locate(self, req: Dict[str, Any]) -> Dict[str, Any]:
         """Em que arquivo e linha cada seletor aparece na suite.
 
@@ -161,8 +158,6 @@ class Bridge:
         for item in req.get("items", []):
             arquivo, seletor = item.get("file"), item["selector"]
             ocorrencias = localizar_no_projeto(raiz, seletor, preferido=arquivo)
-            # Quando o seletor mora fora do .spec.ts, aponta-se o arquivo real,
-            # para que a correcao manual nao comece por uma caca ao seletor.
             arquivo_real = ocorrencias[0][0] if ocorrencias else arquivo
             localizados.append({"file": arquivo_real, "selector": seletor,
                                 "lines": [n for _a, n in ocorrencias],
@@ -170,7 +165,6 @@ class Bridge:
                                                 for a, n in ocorrencias]})
         return {"ok": True, "located": localizados}
 
-    # -- relatorio ---------------------------------------------------------
     def cmd_report(self, req: Dict[str, Any]) -> Dict[str, Any]:
         """Consolida a execucao da suite em .selfheal/report.json.
 
@@ -182,11 +176,6 @@ class Bridge:
 
         relatorio = Report(req.get("path", ".selfheal/report.json"))
 
-        # Uma mudanca de interface costuma levar mais de uma execucao para ser
-        # absorvida: um seletor so quebra depois que o anterior volta a
-        # funcionar. Por isso o relatorio acumula as execucoes em vez de
-        # sobrescrever — o que interessa e a campanha de correcao inteira, e
-        # nao a ultima rodada. Para comecar do zero, apague o arquivo.
         vistos = set()
         anterior: Dict[str, Any] = {}
         acumular = relatorio.path.exists() and not req.get("reset")
@@ -214,7 +203,8 @@ class Bridge:
                 breakdown=fix.get("breakdown") or {},
                 element=fix.get("element") or {},
                 status="applied" if aplicado else "pending",
-                duration_ms=float(fix.get("duration_ms") or 0.0)))
+                duration_ms=float(fix.get("duration_ms") or 0.0),
+                rewrite_ms=float(fix.get("rewrite_ms") or 0.0)))
         for miss in req.get("misses", []):
             if (miss.get("file"), miss["old"]) in vistos:
                 continue
@@ -228,21 +218,13 @@ class Bridge:
         payload = relatorio.save()
         suite = req.get("suite")
         if suite and relatorio.records:
-            # Sem self-healing, todo seletor quebrado da campanha exigiria
-            # correcao manual — inclusive os que so apareceram em rodadas
-            # posteriores.
             previa = (anterior.get("suite") or {}) if acumular else {}
             suite = dict(suite)
             suite["execucoes"] = previa.get("execucoes", 0) + 1
-            # Quantos testes falhariam sem a ferramenta: o pior momento da
-            # campanha, nao o da ultima rodada — quando a suite ja esta verde
-            # justamente porque as correcoes foram aplicadas.
             suite["failed_without_healing"] = max(
                 suite.get("failed_without_healing", 0),
                 previa.get("failed_without_healing", 0))
         if suite:
-            # Resultado da suite (testes que passaram/falharam) fica junto do
-            # relatorio: e o que permite comparar com e sem self-healing.
             dados = json.loads(Path(relatorio.path).read_text(encoding="utf-8"))
             dados["suite"] = suite
             Path(relatorio.path).write_text(
@@ -279,7 +261,7 @@ def main(argv=None) -> int:
             else:
                 resp = handler(req)
             resp["id"] = req.get("id")
-        except Exception as exc:  # devolve o erro em vez de derrubar a suite
+        except Exception as exc:
             resp = {"ok": False, "error": str(exc), "id": None}
         sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
         sys.stdout.flush()

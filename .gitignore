@@ -9,3 +9,13 @@ __pycache__/
 **/.selfheal/*
 !**/.selfheal/knowledge.json
 test-results/
+
+# Relatorio navegavel do Playwright, gerado a cada execucao.
+**/playwright-report/
+**/test-results/
+
+# Ambiente virtual criado pelo postinstall do pacote npm nas plataformas sem
+# binario compilado, e artefatos de empacotamento.
+**/.venv/
+*.tgz
+/dist/

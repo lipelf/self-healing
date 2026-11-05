@@ -58,6 +58,9 @@ class SelfHealReporter {
                 const info = applied.find((a) => a.old === f.old);
                 if (info?.line)
                     f.line = info.line;
+                // custo da reescrita, para comparar com o custo da decisao
+                if (info?.rewrite_ms !== undefined)
+                    f.rewrite_ms = info.rewrite_ms;
                 const local = f.line
                     ? `${CINZA}${(0, node_path_1.basename)(f.file)}:${f.line}${RESET}`
                     : '';

@@ -9,6 +9,8 @@ export interface Fix {
     element?: Record<string, string>;
     breakdown?: Record<string, number>;
     duration_ms?: number;
+    /** Tempo da reescrita no codigo, preenchido pelo engine ao aplicar. */
+    rewrite_ms?: number;
 }
 export interface Miss {
     file?: string;

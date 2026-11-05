@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * Acopla o self-healing a um projeto Playwright existente.
- *
- * Registra o reporter, liga o Chromium em janela e troca a origem do import
- * nos arquivos de teste. Depois disso a suite continua sendo executada com
- * `npx playwright test`, exatamente como antes.
- */
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -22,7 +15,6 @@ function acharConfig(dir: string): string | null {
   return CONFIGS.map((c) => join(dir, c)).find(existsSync) || null;
 }
 
-/** Procura o projeto de testes na pasta atual ou nas subpastas usuais. */
 function acharProjeto(indicado?: string): string | null {
   if (indicado) return acharConfig(indicado) ? indicado : null;
   const aqui = process.cwd();
@@ -36,7 +28,6 @@ function acharProjeto(indicado?: string): string | null {
   return null;
 }
 
-/** Registra o reporter e o Chromium com janela, preservando o que ja existe. */
 function ajustarConfig(config: string, headless: boolean): string[] {
   let src = readFileSync(config, 'utf8');
   const feito: string[] = [];
@@ -83,10 +74,7 @@ const GITIGNORE = [
   '',
 ].join('\n');
 
-/** Garante que a base de conhecimento seja versionada, e o resto ignorado. */
 function ajustarGitignore(projeto: string): string | null {
-  // Procura o .gitignore do repositorio, que pode estar acima da pasta de
-  // testes quando ela e um subdiretorio do projeto.
   let dir = projeto;
   for (let i = 0; i < 4; i++) {
     const caminho = join(dir, '.gitignore');
@@ -96,7 +84,6 @@ function ajustarGitignore(projeto: string): string | null {
         return 'base de conhecimento ja versionada (.gitignore)';
       }
       if (/^\.selfheal\/?\s*$/m.test(texto)) {
-        // Regra existente ignora a base inteira: abre excecao para ela.
         writeFileSync(caminho,
           texto.replace(/^\.selfheal\/?\s*$/m,
                         '**/.selfheal/*\n!**/.selfheal/knowledge.json'),
@@ -111,8 +98,6 @@ function ajustarGitignore(projeto: string): string | null {
     dir = pai;
   }
 
-  // Sem .gitignore: cria um, mas apenas onde ha um repositorio. Em um projeto
-  // que nao usa git o arquivo seria lixo, e a regra nao teria efeito algum.
   let raiz = projeto;
   for (let i = 0; i < 4; i++) {
     if (existsSync(join(raiz, '.git'))) {
@@ -136,7 +121,6 @@ function specsEm(dir: string, encontrados: string[] = []): string[] {
   return encontrados;
 }
 
-/** Troca a origem do import: e a unica alteracao que os testes sofrem. */
 function ajustarSpecs(projeto: string, config: string): string[] {
   const m = readFileSync(config, 'utf8').match(/testDir\s*:\s*['"]([^'"]+)['"]/);
   const raiz = m ? join(projeto, m[1]) : projeto;
@@ -184,14 +168,9 @@ function main() {
   const git = ajustarGitignore(projeto);
   if (git) console.log(`  ${VERDE}${git}${RESET}`);
 
-  // Confirma que o engine sera encontrado na hora do teste. Descobrir isso
-  // agora e melhor do que descobrir no meio da suite.
   let engine = resolveEngine();
 
   if (!engine) {
-    // O npm pode ter bloqueado o script de instalacao do pacote (as versoes
-    // recentes pedem aprovacao explicita). Como o usuario esta justamente
-    // pedindo a configuracao, provisiona-se aqui.
     console.log(`  ${CINZA}engine ainda nao provisionado; preparando...${RESET}`);
     const provisionador = join(__dirname, '..', 'scripts', 'postinstall.js');
     if (existsSync(provisionador)) {

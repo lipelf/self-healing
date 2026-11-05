@@ -9,8 +9,6 @@ from .descriptor import ElementDescriptor
 
 INTERACTIVE = "a, button, input, select, textarea, [role=button], [onclick], [data-testid]"
 
-# Script executado dentro da pagina: coleta as 11 propriedades de cada
-# elemento interativo visivel.
 COLLECT_JS = r"""
 (selector) => {
   const xpathOf = (el) => {

@@ -6,7 +6,8 @@ test.describe('Estilo moderno', () => {
     const login = new LoginPage(page);
     await login.abrir();
     await login.preencherEmail('luiz@unesc.net');
+    await page.fill('#login-senha', 'unesc2026');
     await login.botaoEntrar().click();
-    await expect(page.locator(SELETOR_EMAIL)).toHaveValue('luiz@unesc.net');
+    await expect(page).toHaveURL(/\/catalogo/);
   });
 });

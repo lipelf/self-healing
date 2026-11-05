@@ -1,436 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ==========================================================================
    ShopDemo — aplicacao alvo dos testes de self-healing.
 
-   As classes .field, .btn, .link e .thumb sao as que o registro de elementos
-   usa, e os cenarios do experimento as substituem por tokens de um "novo
-   design system". Renomea-las aqui quebraria a mutacao, entao elas sao
-   mantidas e apenas reestilizadas.
+   As classes .field, .btn, .link e .thumb vem do registro de elementos, e os
+   cenarios do experimento as substituem por tokens de um "novo design system".
+   Elas permanecem como ganchos semanticos, sem estilo proprio: a aparencia vem
+   das utilitarias do Tailwind aplicadas nos componentes.
    ========================================================================== */
 
-:root {
-  --tinta:        #0f1724;
-  --tinta-2:      #475569;
-  --tinta-3:      #94a3b8;
-  --linha:        #e2e8f0;
-  --linha-forte:  #cbd5e1;
-  --fundo:        #f1f5f9;
-  --papel:        #ffffff;
-  --marca:        #4338ca;
-  --marca-escura: #3730a3;
-  --marca-clara:  #eef2ff;
-  --verde:        #047857;
-  --verde-claro:  #ecfdf5;
-  --vermelho:     #be123c;
-  --ambar:        #b45309;
-  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px;
-  --sombra-1: 0 1px 2px rgba(15, 23, 36, .06);
-  --sombra-2: 0 2px 8px rgba(15, 23, 36, .07), 0 1px 2px rgba(15, 23, 36, .04);
-  --sombra-3: 0 10px 30px rgba(15, 23, 36, .10);
+@layer base {
+  :root {
+    --fonte-titulo: 'Plus Jakarta Sans';
+    --fonte-corpo: 'Inter';
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    @apply bg-fundo text-grafite-900 antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
+  }
+
+  h1, h2, h3, h4 { @apply font-titulo tracking-tight; }
+
+  ::selection { @apply bg-marca-100 text-marca-800; }
+
+  /* Rolagem discreta, no tom da interface. */
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-thumb { @apply rounded-full bg-grafite-200; border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-grafite-300; background-clip: content-box; }
 }
 
-* { box-sizing: border-box; }
+@layer components {
+  /* Conteudo de cada pagina entra suavemente, em vez de piscar. */
+  .pagina { @apply animate-surgir; }
 
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: var(--fundo);
-  color: var(--tinta);
-  -webkit-font-smoothing: antialiased;
-  font-size: 15px;
-  line-height: 1.55;
-}
+  /* Esqueleto de carregamento. */
+  .esqueleto {
+    @apply rounded-xl animate-brilho;
+    background-image: linear-gradient(90deg, #EFEEF1 25%, #F7F7F8 37%, #EFEEF1 63%);
+    background-size: 840px 100%;
+  }
 
-.wrap { max-width: 1080px; margin: 0 auto; padding: var(--s-6) var(--s-5) 80px; }
-
-/* -- cabecalho ------------------------------------------------------------ */
-.topbar {
-  background: var(--tinta);
-  color: #cbd5e1;
-  font-size: 12.5px;
-  letter-spacing: .01em;
-}
-.topbar-in {
-  max-width: 1080px; margin: 0 auto; padding: 7px var(--s-5);
-  display: flex; align-items: center; gap: var(--s-4);
-}
-.topbar strong { color: #fff; font-weight: 600; }
-.topbar-sep { margin-left: auto; display: flex; gap: var(--s-4); }
-
-.header {
-  background: var(--papel);
-  border-bottom: 1px solid var(--linha);
-  position: sticky; top: 0; z-index: 20;
-}
-.header-in {
-  max-width: 1080px; margin: 0 auto; padding: var(--s-3) var(--s-5);
-  display: flex; align-items: center; gap: var(--s-5);
-}
-.marca { display: flex; align-items: center; gap: var(--s-2); text-decoration: none; }
-.marca-sigla {
-  width: 30px; height: 30px; border-radius: 8px; flex: none;
-  background: linear-gradient(135deg, var(--marca), #6366f1);
-  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px;
-}
-.marca-nome { font-weight: 700; font-size: 16px; color: var(--tinta); letter-spacing: -.01em; }
-
-.busca-global { position: relative; flex: 1; max-width: 400px; }
-.busca-global input {
-  width: 100%; padding: 8px 12px 8px 34px; font-size: 14px;
-  border: 1px solid var(--linha-forte); border-radius: var(--r-md);
-  background: var(--fundo); color: var(--tinta);
-}
-.busca-global input:focus {
-  outline: none; background: var(--papel);
-  border-color: var(--marca); box-shadow: 0 0 0 3px rgba(67, 56, 202, .12);
-}
-.busca-icone {
-  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
-  color: var(--tinta-3); pointer-events: none; display: flex;
+  /* Numeros tabulares onde valores se alinham em coluna. */
+  .numero { font-variant-numeric: tabular-nums; }
 }
 
-nav.top { display: flex; gap: var(--s-1); margin-left: auto; }
-nav.top a {
-  color: var(--tinta-2); text-decoration: none; font-size: 14px; font-weight: 500;
-  padding: 6px 11px; border-radius: var(--r-sm);
-}
-nav.top a:hover { color: var(--marca); background: var(--marca-clara); }
-
-.header-acoes { display: flex; align-items: center; gap: var(--s-2); }
-.icone-botao {
-  position: relative; width: 34px; height: 34px; border-radius: var(--r-sm);
-  border: 1px solid var(--linha); background: var(--papel); color: var(--tinta-2);
-  display: grid; place-items: center; cursor: pointer;
-}
-.icone-botao:hover { border-color: var(--linha-forte); color: var(--tinta); }
-.selo-contagem {
-  position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px;
-  padding: 0 4px; border-radius: 8px; background: var(--vermelho); color: #fff;
-  font-size: 10px; font-weight: 700; display: grid; place-items: center;
-}
-.avatar {
-  width: 30px; height: 30px; border-radius: 50%; flex: none;
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-  color: #fff; font-size: 12px; font-weight: 700;
-  display: grid; place-items: center; cursor: pointer;
-}
-
-/* -- trilha e titulos ----------------------------------------------------- */
-.trilha {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  font-size: 12.5px; color: var(--tinta-3); margin-bottom: var(--s-4);
-}
-.trilha a { color: var(--tinta-2); text-decoration: none; }
-.trilha a:hover { color: var(--marca); }
-.trilha span.sep { color: var(--linha-forte); }
-
-.pagina-topo {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: var(--s-4); margin-bottom: var(--s-5); flex-wrap: wrap;
-}
-h1 { font-size: 26px; line-height: 1.2; margin: 0 0 var(--s-1); letter-spacing: -.02em; }
-p.sub { color: var(--tinta-2); margin: 0; font-size: 14.5px; max-width: 60ch; }
-
-/* -- superficies ---------------------------------------------------------- */
-.card {
-  background: var(--papel); border: 1px solid var(--linha);
-  border-radius: var(--r-lg); padding: var(--s-5);
-  margin-bottom: var(--s-4); box-shadow: var(--sombra-1);
-}
-.card-titulo {
-  font-size: 13px; font-weight: 600; color: var(--tinta-2);
-  text-transform: uppercase; letter-spacing: .05em;
-  margin: 0 0 var(--s-4); padding-bottom: var(--s-3);
-  border-bottom: 1px solid var(--linha);
-}
-
-/* -- formularios ---------------------------------------------------------- */
-label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; color: var(--tinta); }
-.row { margin-bottom: var(--s-4); }
-.row:last-child { margin-bottom: 0; }
-.ajuda { font-size: 12.5px; color: var(--tinta-3); margin: 6px 0 0; }
-
-.field {
-  width: 100%; padding: 10px 13px; font-size: 14px; color: var(--tinta);
-  border: 1px solid var(--linha-forte); border-radius: var(--r-md);
-  background: var(--papel); font-family: inherit;
-}
-.field:focus {
-  outline: none; border-color: var(--marca);
-  box-shadow: 0 0 0 3px rgba(67, 56, 202, .12);
-}
-.field::placeholder { color: var(--tinta-3); }
-select.field { cursor: pointer; }
-
-/* -- botoes --------------------------------------------------------------- */
-.btn {
-  padding: 10px 18px; border-radius: var(--r-md); border: 1px solid transparent;
-  font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
-  display: inline-flex; align-items: center; gap: 7px; line-height: 1.2;
-}
-.btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--marca); color: #fff; box-shadow: var(--sombra-1); }
-.btn-primary:hover { background: var(--marca-escura); }
-.btn-secondary { background: var(--papel); color: var(--tinta); border-color: var(--linha-forte); }
-.btn-secondary:hover { border-color: var(--tinta-3); background: #f8fafc; }
-.btn-ghost { background: transparent; color: var(--marca); padding: 6px 10px; font-weight: 500; }
-.btn-ghost:hover { background: var(--marca-clara); }
-.btn-add { background: var(--verde); color: #fff; }
-.btn-add:hover { background: #036249; }
-.btn-danger { background: var(--papel); color: var(--vermelho); border-color: #fecdd3; }
-.btn-danger:hover { background: #fff1f2; }
-.btn-qty {
-  background: var(--papel); color: var(--tinta); border-color: var(--linha-forte);
-  padding: 5px 11px; font-size: 15px; font-weight: 600; min-width: 32px;
-  justify-content: center;
-}
-.btn-qty:hover { background: var(--fundo); }
-.btn-bloco { width: 100%; justify-content: center; }
-
-.link { color: var(--marca); font-size: 13.5px; text-decoration: none; font-weight: 500; }
-.link:hover { text-decoration: underline; }
-.link-muted { margin-right: var(--s-4); }
-
-/* -- catalogo ------------------------------------------------------------- */
-.toolbar {
-  display: flex; gap: var(--s-3); margin-bottom: var(--s-5);
-  align-items: flex-end; flex-wrap: wrap;
-}
-.toolbar .campo-grupo { flex: 1; min-width: 180px; }
-.campo-grupo label { font-size: 12px; color: var(--tinta-2); }
-
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-4); }
-/* O cartao usa grid em vez de aninhar os controles em um involucro: assim o
-   botao e a ligacao continuam sendo irmaos do nome do produto, e o texto de
-   vizinhanca de cada um carrega esse nome. E essa propriedade que distingue
-   um "Adicionar ao carrinho" dos demais quando o identificador, a classe e o
-   atributo name ja foram destruidos pelos cenarios de mudanca. */
-.produto {
-  display: grid; grid-template-columns: 1fr auto; align-content: start;
-  border: 1px solid var(--linha); border-radius: var(--r-lg);
-  background: var(--papel); box-shadow: var(--sombra-1); overflow: hidden;
-}
-.produto:hover { box-shadow: var(--sombra-2); border-color: var(--linha-forte); }
-.produto-imagem {
-  grid-column: 1 / -1; height: 120px;
-  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 50%, #ddd6fe 100%);
-  display: grid; place-items: center; color: #6366f1; position: relative;
-}
-.produto h3 {
-  grid-column: 1 / -1; margin: 0 0 3px; padding: var(--s-4) var(--s-4) 0;
-  font-size: 15px; font-weight: 650; letter-spacing: -.01em;
-}
-.produto-meta {
-  grid-column: 1 / -1; font-size: 12.5px; color: var(--tinta-3);
-  margin: 0 0 var(--s-3); padding: 0 var(--s-4);
-}
-.preco {
-  grid-column: 1 / -1; color: var(--tinta); font-weight: 700; font-size: 18px;
-  margin: 0 0 var(--s-3); padding: 0 var(--s-4); letter-spacing: -.02em;
-}
-.preco-antes {
-  grid-column: 1 / -1; font-size: 12.5px; color: var(--tinta-3);
-  text-decoration: line-through; margin: 0; padding: 0 var(--s-4);
-}
-.produto > button { grid-column: 1; margin: 0 0 var(--s-4) var(--s-4); }
-.produto > a {
-  grid-column: 2; align-self: center;
-  margin: 0 var(--s-4) var(--s-4) var(--s-3);
-}
-
-.selo {
-  display: inline-flex; align-items: center; gap: 4px; font-size: 11px;
-  font-weight: 700; padding: 3px 8px; border-radius: 20px; letter-spacing: .02em;
-}
-.selo-oferta { background: var(--verde-claro); color: var(--verde); }
-.selo-novo   { background: var(--marca-clara); color: var(--marca); }
-.selo-ultimo { background: #fffbeb; color: var(--ambar); }
-.produto-imagem .selo { position: absolute; top: 10px; left: 10px; }
-
-.estrelas { color: #f59e0b; font-size: 12px; letter-spacing: 1px; }
-
-.paginacao {
-  display: flex; align-items: center; justify-content: center; gap: var(--s-2);
-  margin-top: var(--s-5);
-}
-.paginacao button {
-  min-width: 34px; height: 34px; padding: 0 10px; font-size: 13.5px; font-weight: 600;
-  border: 1px solid var(--linha-forte); background: var(--papel); color: var(--tinta-2);
-  border-radius: var(--r-sm); cursor: pointer;
-}
-.paginacao button:hover { border-color: var(--marca); color: var(--marca); }
-.paginacao button[aria-current='page'] {
-  background: var(--marca); border-color: var(--marca); color: #fff;
-}
-
-/* -- carrinho ------------------------------------------------------------- */
-.item {
-  display: flex; align-items: center; gap: var(--s-4);
-  padding: var(--s-4) 0; border-bottom: 1px solid var(--linha);
-}
-.item:last-of-type { border-bottom: none; }
-.item-imagem {
-  width: 56px; height: 56px; border-radius: var(--r-md); flex: none;
-  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
-  display: grid; place-items: center; color: #6366f1;
-}
-.item-info { flex: 1; min-width: 0; }
-.item-info h4 { margin: 0 0 2px; font-size: 14.5px; font-weight: 650; }
-.item-info p { margin: 0; font-size: 12.5px; color: var(--tinta-3); }
-.qty { display: flex; align-items: center; gap: var(--s-2); }
-.qty-valor { min-width: 24px; text-align: center; font-weight: 650; font-size: 14px; }
-.item-preco { font-weight: 700; min-width: 86px; text-align: right; font-size: 15px; }
-
-.resumo-linha {
-  display: flex; justify-content: space-between; padding: 7px 0;
-  font-size: 14px; color: var(--tinta-2);
-}
-.total {
-  display: flex; justify-content: space-between; font-weight: 700;
-  padding-top: var(--s-3); margin-top: var(--s-2); font-size: 18px;
-  border-top: 1px solid var(--linha); letter-spacing: -.02em;
-}
-.cupom-area { display: flex; gap: var(--s-2); align-items: flex-end; }
-.cupom-area .campo-grupo { flex: 1; }
-
-.aviso {
-  display: flex; gap: var(--s-3); padding: var(--s-3) var(--s-4);
-  background: var(--marca-clara); border: 1px solid #c7d2fe;
-  border-radius: var(--r-md); font-size: 13.5px; color: var(--marca-escura);
-  margin-bottom: var(--s-4);
-}
-
-/* -- checkout ------------------------------------------------------------- */
-.passos { display: flex; gap: var(--s-2); margin-bottom: var(--s-5); flex-wrap: wrap; }
-.passo {
-  display: flex; align-items: center; gap: 7px; font-size: 13px;
-  color: var(--tinta-3); font-weight: 500;
-}
-.passo-num {
-  width: 22px; height: 22px; border-radius: 50%; font-size: 11.5px; font-weight: 700;
-  display: grid; place-items: center; background: var(--linha); color: var(--tinta-2);
-}
-.passo.ativo { color: var(--tinta); font-weight: 650; }
-.passo.ativo .passo-num { background: var(--marca); color: #fff; }
-.passo.feito .passo-num { background: var(--verde); color: #fff; }
-.passo-traco { flex: 1; min-width: 20px; height: 1px; background: var(--linha); align-self: center; }
-
-.colunas { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--s-4); align-items: start; }
-.dupla { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
-
-/* -- galeria -------------------------------------------------------------- */
-.gal { display: flex; gap: var(--s-3); flex-wrap: wrap; }
-.thumb, .ds-thumb {
-  width: 76px; height: 76px; border-radius: var(--r-md); padding: 0;
-  border: 1px solid var(--linha-forte);
-  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
-  cursor: pointer;
-}
-.thumb:hover, .ds-thumb:hover { border-color: var(--marca); box-shadow: var(--sombra-2); }
-
-/* -- rodape --------------------------------------------------------------- */
-.rodape { background: var(--papel); border-top: 1px solid var(--linha); margin-top: 60px; }
-.rodape-in {
-  max-width: 1080px; margin: 0 auto; padding: var(--s-6) var(--s-5) var(--s-5);
-  display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: var(--s-5);
-}
-.rodape h5 {
-  font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--tinta-2); margin: 0 0 var(--s-3); font-weight: 650;
-}
-.rodape ul { list-style: none; margin: 0; padding: 0; }
-.rodape li { margin-bottom: 7px; }
-.rodape a { color: var(--tinta-2); font-size: 13.5px; text-decoration: none; }
-.rodape a:hover { color: var(--marca); }
-.rodape-sobre p { font-size: 13.5px; color: var(--tinta-2); margin: 0; max-width: 34ch; }
-.rodape-base {
-  max-width: 1080px; margin: 0 auto; padding: var(--s-4) var(--s-5);
-  border-top: 1px solid var(--linha); font-size: 12.5px; color: var(--tinta-3);
-  display: flex; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap;
-}
-
-/* ==========================================================================
-   Deslocamentos aplicados pelos cenarios de mudanca de interface.
-   Alteram a geometria real dos elementos (posicao, area e proporcao).
-   ========================================================================== */
-body.v-c2 .wrap { padding-left: 120px; padding-top: 56px; }
-body.v-c2 .btn  { padding: 14px 26px; }
-body.v-c2 .toolbar { flex-direction: column; align-items: stretch; }
-body.v-c3 .wrap { padding-left: 96px; padding-top: 40px; }
-body.v-c3 .btn  { padding: 12px 30px; }
-body.v-c4 .wrap { padding-left: 64px; }
-body.v-c4 .layer-a { padding: 12px; border-radius: var(--r-md); }
-body.v-c4 .layer-b { padding: 10px; }
-body.v-c2 .thumb, body.v-c2 .ds-thumb { width: 88px; height: 88px; }
-body.v-c4 .ds-thumb { width: 80px; height: 80px; }
-
-/* Tokens do "novo design system" introduzido pelos cenarios C2 em diante.
-   Sem eles a pagina mutada perderia o estilo e a comparacao geometrica
-   deixaria de refletir um redesign real. */
-.ds-input, .ds-select {
-  width: 100%; padding: 10px 13px; font-size: 14px; color: var(--tinta);
-  border: 1px solid var(--linha-forte); border-radius: var(--r-md); background: var(--papel);
-  font-family: inherit;
-}
-.ds-btn {
-  padding: 10px 18px; border-radius: var(--r-md); border: 1px solid transparent;
-  font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
-  display: inline-flex; align-items: center; gap: 7px;
-}
-.ds-btn--primary { background: var(--marca); color: #fff; }
-.ds-btn--secondary { background: var(--papel); color: var(--tinta); border-color: var(--linha-forte); }
-.ds-btn--ghost { background: transparent; color: var(--marca); padding: 6px 10px; }
-.ds-btn--accent { background: var(--verde); color: #fff; }
-.ds-btn--danger { background: var(--papel); color: var(--vermelho); border-color: #fecdd3; }
-.ds-btn--icon {
-  background: var(--papel); color: var(--tinta); border-color: var(--linha-forte);
-  padding: 5px 11px; min-width: 32px; justify-content: center;
-}
-.ds-link { color: var(--marca); font-size: 13.5px; text-decoration: none; font-weight: 500; }
-.ds-link--muted { margin-right: var(--s-4); }
-
-/* ==========================================================================
-   Painel de revisao
-   ========================================================================== */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-3); margin-bottom: var(--s-5); }
-.stat {
-  background: var(--papel); border: 1px solid var(--linha);
-  border-radius: var(--r-lg); padding: var(--s-4); box-shadow: var(--sombra-1);
-}
-.stat-label {
-  display: block; font-size: 11.5px; color: var(--tinta-2); margin-bottom: 6px;
-  text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
-}
-.stat-value { font-size: 26px; font-weight: 700; color: var(--tinta); letter-spacing: -.02em; }
-.correction { padding: var(--s-4); }
-.corr-head { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
-.corr-head code {
-  font-size: 12.5px; padding: 3px 8px; border-radius: var(--r-sm);
-  font-family: 'SF Mono', Menlo, monospace;
-}
-.old { background: #fff1f2; color: var(--vermelho); text-decoration: line-through; }
-.new { background: var(--verde-claro); color: var(--verde); }
-.fail { background: var(--fundo); color: var(--tinta-2); }
-.arrow { color: var(--tinta-3); }
-.score { margin-left: auto; font-size: 12px; color: var(--tinta-2); font-weight: 600; }
-.loc { font-size: 12px; color: var(--tinta-3); margin: var(--s-2) 0 0; font-family: 'SF Mono', Menlo, monospace; }
-details { margin-top: var(--s-2); }
-summary { font-size: 13px; cursor: pointer; color: var(--marca); font-weight: 500; }
-.bars { margin-top: var(--s-2); }
-.bar-row { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: var(--s-2); margin-bottom: var(--s-1); }
-.bar-label { font-size: 11px; color: var(--tinta-2); }
-.bar-track { background: var(--fundo); height: 7px; border-radius: 4px; overflow: hidden; }
-.bar-fill { background: var(--marca); height: 100%; border-radius: 4px; }
-.bar-value { font-size: 11px; color: var(--tinta-2); text-align: right; font-weight: 600; }
-.actions { display: flex; gap: var(--s-2); align-items: center; margin-top: var(--s-3); }
-.tag { font-size: 12px; padding: 3px 9px; border-radius: 20px; font-weight: 600; }
-.tag.accepted { background: var(--verde-claro); color: var(--verde); }
-.tag.rejected { background: #fff1f2; color: var(--vermelho); }
-
-@media (max-width: 860px) {
-  .grid, .colunas, .dupla { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .rodape-in { grid-template-columns: 1fr 1fr; }
-  nav.top { display: none; }
-  .busca-global { max-width: none; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
 }

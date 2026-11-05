@@ -1,18 +1,8 @@
-/**
- * Fixture que envolve a `page` do Playwright.
- *
- * A ideia central: o teste continua sendo escrito exatamente como antes.
- * Quando uma acao falha porque o seletor nao encontrou o elemento, este
- * envoltorio intercepta a falha antes que ela derrube o teste, pergunta ao
- * engine qual e o elemento correspondente na pagina atual e registra a
- * correcao para que o codigo do teste seja reescrito ao final da execucao.
- */
 import { test as base, expect } from '@playwright/test';
 import { collectCandidates, describeSelector, describeLocator } from './collector';
 import { getBridge } from './bridge-client';
 import { recordFix, recordMiss } from './store';
 
-// Metodos de `page` cujo primeiro argumento e um seletor.
 const SELECTOR_METHODS = [
   'click', 'fill', 'type', 'press', 'check', 'uncheck', 'hover',
   'selectOption', 'focus', 'tap', 'dblclick', 'setInputFiles',
@@ -20,8 +10,6 @@ const SELECTOR_METHODS = [
   'isChecked', 'waitForSelector',
 ];
 
-// Acoes chamadas sobre um Locator, e nao sobre a page. Sao estas que precisam
-// ser envolvidas quando o teste usa localizadores semanticos.
 const LOCATOR_METHODS = [
   'click', 'fill', 'type', 'press', 'check', 'uncheck', 'hover',
   'selectOption', 'focus', 'tap', 'dblclick', 'setInputFiles',
@@ -29,16 +17,6 @@ const LOCATOR_METHODS = [
   'isChecked',
 ];
 
-/**
- * Chave canonica para um localizador semantico.
- *
- * O Locator devolvido pelo Playwright e usado tal e qual, preservando a
- * semantica de correspondencia do framework. Esta chave serve apenas para
- * indexar a base de conhecimento e para reencontrar a chamada no codigo-fonte
- * na hora da reescrita. Quando os argumentos nao sao textos simples, por
- * exemplo expressoes regulares, devolve-se null e o localizador segue sem
- * acompanhamento, em vez de se registrar uma chave ambigua.
- */
 const CHAVE_GETBY: Record<string, (args: any[]) => string | null> = {
   getByTestId:      (a) => (typeof a[0] === 'string' ? `getByTestId=${a[0]}` : null),
   getByText:        (a) => (typeof a[0] === 'string' ? `getByText=${a[0]}` : null),
@@ -54,10 +32,6 @@ const CHAVE_GETBY: Record<string, (args: any[]) => string | null> = {
   },
 };
 
-/**
- * Acrescenta um limite de espera a chamada, sem sobrescrever o que o usuario
- * tenha definido explicitamente.
- */
 function withTimeout(args: any[], timeout: number): any[] {
   const copia = [...args];
   const ultimo = copia[copia.length - 1];
@@ -80,17 +54,10 @@ function isNotFound(err: any): boolean {
 
 export interface SelfHealOptions {
   enabled?: boolean;
-  /**
-   * true (padrao): apos recuperar, a acao prossegue com o novo seletor e o
-   * teste segue verde na mesma execucao. false: a falha e mantida visivel e
-   * apenas o primeiro seletor de cada teste e corrigido por execucao.
-   */
   autoRetry?: boolean;
-  /**
-   * Quanto esperar por um elemento antes de tentar recupera-lo, em ms.
-   * Sem esse limite a acao consumiria o timeout inteiro do teste e o
-   * Playwright abortaria antes que a recuperacao pudesse acontecer.
-   */
+  // Quanto esperar por um elemento antes de tentar recupera-lo. Sem esse
+  // limite a acao consumiria o timeout inteiro do teste e o Playwright
+  // abortaria antes que a recuperacao pudesse acontecer.
   healTimeout?: number;
   python?: string;
   knowledge?: string;
@@ -99,23 +66,47 @@ export interface SelfHealOptions {
 }
 
 export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
-  // autoRetry ligado: apos recuperar o seletor a acao prossegue, de modo que
-  // uma unica execucao corrija todos os seletores quebrados do teste. Com ele
-  // desligado, o teste para na primeira falha e so o primeiro e corrigido.
   selfheal: [{ enabled: true, autoRetry: true, healTimeout: 2000 }, { option: true }],
 
   page: async ({ page, selfheal }, use, testInfo) => {
     if (selfheal?.enabled === false) { await use(page); return; }
 
     const bridge = getBridge(selfheal);
-    const healed = new Map<string, string>();   // seletor antigo -> novo
-    const learning: Promise<any>[] = [];        // aprendizados em voo
-    const seen = new Set<string>();             // seletores usados no teste
+    const healed = new Map<string, string>();
+    const learning: Promise<any>[] = [];
+    const seen = new Set<string>();
     const testFile = testInfo.file;
     const testName = testInfo.title;
 
-    /** Aprende o elemento sempre que ele e encontrado com sucesso. */
-    const learn = (selector: string) => {
+    // Fotografa o elemento SEM gravar. Clicar ou preencher pode alterar o
+    // proprio elemento ou o texto a sua volta, e memorizar o estado posterior
+    // gravaria um caso transitorio, levando a recuperacao seguinte a casar
+    // com o elemento errado.
+    const fotografar = async (selector: string) => {
+      try {
+        return await describeSelector(page, selector);
+      } catch {
+        return null;
+      }
+    };
+
+    const gravar = (selector: string, descritor: any) => {
+      if (!descritor) return;
+      const task = (async () => {
+        try {
+          await bridge.remember(selector, descritor);
+        } catch (e) {
+          if (process.env.SELFHEAL_DEBUG) {
+            console.error(`[selfheal] erro ao gravar ${selector}: ${e}`);
+          }
+        }
+      })();
+      learning.push(task);
+      return task;
+    };
+
+    const learn = (selector: string, previa?: any) => {
+      if (previa) return gravar(selector, previa);
       const task = (async () => {
         try {
           const d = await describeSelector(page, selector);
@@ -133,23 +124,17 @@ export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
       return task;
     };
 
-    /** Aprende a partir de um Locator, para os localizadores semanticos. */
     const learnLocator = (chave: string, locator: any) => {
       const task = (async () => {
         try {
           const d = await describeLocator(page, locator);
           if (d) await bridge.remember(chave, d);
-        } catch { /* elemento ausente agora: nada a memorizar */ }
+        } catch {}
       })();
       learning.push(task);
       return task;
     };
 
-    /**
-     * Envolve um Locator semantico para que a falha de uma acao dispare a
-     * recuperacao. O Locator original e preservado: so quando ele falha por
-     * nao encontrar o elemento e que se tenta o substituto.
-     */
     const wrapLocator = (locator: any, chave: string): any => new Proxy(locator, {
       get(alvo, prop: string, receptor) {
         const original = Reflect.get(alvo, prop, receptor);
@@ -157,9 +142,11 @@ export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
         if (!LOCATOR_METHODS.includes(prop)) return original.bind(alvo);
 
         return async (...args: any[]) => {
+          let previa: any = null;
+          try { previa = await describeLocator(page, alvo); } catch { previa = null; }
           try {
             const r = await original.apply(alvo, withTimeout(args, limite));
-            learnLocator(chave, alvo);
+            if (previa) gravar(chave, previa); else learnLocator(chave, alvo);
             return r;
           } catch (err) {
             if (!isNotFound(err)) throw err;
@@ -177,7 +164,6 @@ export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
       },
     });
 
-    /** Tenta descobrir o substituto de um seletor que falhou. */
     const recover = async (selector: string): Promise<string | null> => {
       if (healed.has(selector)) return healed.get(selector)!;
       let candidates: any[] = [];
@@ -209,9 +195,6 @@ export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
       get(target, prop: string, receiver) {
         const original = Reflect.get(target, prop, receiver);
 
-        // Localizadores semanticos (getByRole, getByTestId e afins). O Locator
-        // do Playwright e devolvido intacto, apenas envolvido, de modo que a
-        // semantica de correspondencia do framework nao seja alterada.
         if (CHAVE_GETBY[prop] && typeof original === 'function') {
           return (...args: any[]) => {
             const chave = CHAVE_GETBY[prop](args);
@@ -224,17 +207,11 @@ export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
           };
         }
 
-        // page.locator(sel) nao falha na criacao, so quando usado. Registra-se
-        // o seletor para que ele possa ser aprendido e, se quebrar, recuperado.
         if (prop === 'locator' && typeof original === 'function') {
           return (...args: any[]) => {
             const sel = args[0];
             if (typeof sel === 'string') {
               seen.add(sel);
-              // Se este seletor ja foi recuperado durante o teste, entrega-se
-              // o substituto. E o que permite que assercoes como
-              // expect(page.locator(...)) passem ainda nesta execucao, ja que
-              // elas nao passam pelos metodos interceptados acima.
               const novo = healed.get(sel);
               if (novo) return original.apply(target, [novo, ...args.slice(1)]);
               learn(sel);
@@ -251,11 +228,11 @@ export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
           const selector = args[0];
           if (typeof selector !== 'string') return original.apply(target, args);
 
-          // Primeira tentativa com espera limitada, para que a recuperacao
-          // aconteca antes de o teste estourar o proprio timeout.
+          const previa = await fotografar(selector);   // antes de agir
+
           try {
             const result = await original.apply(target, withTimeout(args, limite));
-            seen.add(selector); learn(selector);
+            seen.add(selector); learn(selector, previa);
             return result;
           } catch (err) {
             if (!isNotFound(err)) throw err;
@@ -263,20 +240,14 @@ export const test = base.extend<{ selfheal: SelfHealOptions; page: any }>({
             const novo = await recover(selector);
 
             if (!novo) {
-              // Nada a corrigir: pode ser um elemento apenas lento. Repete a
-              // chamada com os parametros originais, honrando o tempo que o
-              // usuario configurou.
               return original.apply(target, args);
             }
 
             if (selfheal?.autoRetry) {
-              // Retoma a acao com o seletor recuperado: o teste segue verde.
               const r = await original.apply(target, [novo, ...args.slice(1)]);
               seen.add(novo); learn(novo);
               return r;
             }
-            // Sem retentativa: a falha permanece visivel, mas o codigo ja
-            // sera corrigido ao final da execucao.
             throw err;
           }
         };

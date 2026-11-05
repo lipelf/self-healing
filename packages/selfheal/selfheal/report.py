@@ -17,8 +17,9 @@ class HealRecord:
     line: Optional[int] = None
     breakdown: Dict[str, float] = field(default_factory=dict)
     element: Dict[str, Any] = field(default_factory=dict)
-    status: str = "pending"   # pending | accepted | rejected | applied
+    status: str = "pending"
     duration_ms: float = 0.0
+    rewrite_ms: float = 0.0
 
 
 class Report:
@@ -30,7 +31,6 @@ class Report:
     def add(self, record: HealRecord) -> None:
         self.records.append(record)
 
-    # -- metricas ----------------------------------------------------------
     @property
     def total(self) -> int:
         return len(self.records)
@@ -47,6 +47,11 @@ class Report:
     def total_duration_ms(self) -> float:
         return sum(r.duration_ms for r in self.records)
 
+    @property
+    def total_rewrite_ms(self) -> float:
+        """Tempo gasto reescrevendo o codigo, somado sobre as correcoes."""
+        return sum(r.rewrite_ms for r in self.records)
+
     def summary(self) -> Dict[str, Any]:
         return {
             "started_at": self.started_at,
@@ -56,6 +61,11 @@ class Report:
             "total_duration_ms": round(self.total_duration_ms, 1),
             "avg_duration_ms": round(
                 self.total_duration_ms / self.total, 1) if self.total else 0.0,
+            "total_rewrite_ms": round(self.total_rewrite_ms, 1),
+            "rewrite_share_pct": round(
+                100 * self.total_rewrite_ms
+                / (self.total_duration_ms + self.total_rewrite_ms), 1)
+            if (self.total_duration_ms + self.total_rewrite_ms) else 0.0,
         }
 
     def save(self) -> Dict[str, Any]:

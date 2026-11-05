@@ -40,7 +40,6 @@ def cmd_report(args) -> None:
         else:
             print(f"        {YELLOW}sem correcao ({r['status']}, "
                   f"melhor score {r['score']:.3f}){RESET}")
-            # Onde corrigir a mao: sem isto, resta procurar o seletor na suite.
             if r.get("file"):
                 local = f"{r['file']}:{r['line']}" if r.get("line") else r["file"]
                 print(f"        {DIM}corrija em {local}{RESET}")
@@ -78,10 +77,6 @@ def cmd_knowledge(args) -> None:
     print()
 
 
-
-# Custo medio de uma correcao manual de seletor, em minutos: localizar a
-# quebra, abrir o inspetor, achar o novo elemento, editar e reexecutar.
-# Medido no experimento controlado; ajustavel por --custo-manual.
 CUSTO_MANUAL_MIN = 4.2
 
 
@@ -108,9 +103,7 @@ def cmd_table(args) -> None:
     custo = args.custo_manual
 
     tempo_auto_min = sum(r.get("duration_ms", 0.0) for r in recuperados) / 60000
-    # Sem a ferramenta, todo seletor quebrado e corrigido a mao.
     tempo_sem = quebrados * custo
-    # Com a ferramenta, so restam os que ela nao conseguiu decidir.
     tempo_com = len(manuais) * custo + tempo_auto_min
     economia = (1 - tempo_com / tempo_sem) * 100 if tempo_sem else 0.0
 
@@ -154,7 +147,6 @@ def cmd_table(args) -> None:
                                  ["Seletor", "Motivo", "Melhor similaridade",
                                   "Local"], detalhe))
 
-    # Tabela por cenario, quando o experimento controlado ja foi executado.
     exp_path = Path(args.experimento)
     if exp_path.exists():
         exp = json.loads(exp_path.read_text(encoding="utf-8"))
@@ -196,7 +188,6 @@ def cmd_table(args) -> None:
     print(f"{DIM}tabela salva em {saida} e {csv_path}{RESET}")
     print(f"{GREEN}economia de tempo ate a suite verde: "
           f"{economia:.1f}%{RESET}\n".replace(".", ","))
-
 
 
 def cmd_init(args) -> None:
@@ -248,7 +239,6 @@ def cmd_init(args) -> None:
     print(f"  recuperado, o codigo do teste e corrigido, e o que nao puder ser")
     print(f"  corrigido aparece com arquivo e linha para ajuste manual.\n")
     print(f"  depois: {BOLD}selfheal table{RESET} gera a tabela comparativa.\n")
-
 
 
 def cmd_build(args) -> None:

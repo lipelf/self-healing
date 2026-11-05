@@ -1,10 +1,3 @@
-/**
- * Coleta os atributos dos elementos interativos diretamente da pagina viva.
- *
- * A funcao `collectFn` e serializada e executada dentro do navegador, e nao
- * no processo de teste: e a unica forma de obter a geometria real dos
- * elementos (posicao, area e proporcao), que so existe apos a renderizacao.
- */
 export const INTERACTIVE =
   'a, button, input, select, textarea, [role=button], [onclick], [data-testid]';
 
@@ -17,7 +10,6 @@ export interface Descriptor {
   meta?: Record<string, string>;
 }
 
-/* Executada no contexto da pagina. */
 function collectFn(selector: string) {
   const xpathOf = (el: any) => {
     const parts: string[] = [];
@@ -91,13 +83,11 @@ function collectFn(selector: string) {
   return out;
 }
 
-/** Descritores de todos os elementos interativos visiveis da pagina. */
 export async function collectCandidates(page: any): Promise<Descriptor[]> {
   const res = await page.evaluate(collectFn, INTERACTIVE);
   return Array.isArray(res) ? res : [];
 }
 
-/** Descritor de um unico elemento, casado pela sua posicao na pagina. */
 export async function describeSelector(
   page: any, selector: string,
 ): Promise<Descriptor | null> {
@@ -109,8 +99,6 @@ export async function describeSelector(
   const candidates = await collectCandidates(page);
   if (!candidates.length) return null;
 
-  // boundingBox devolve a posicao relativa a area visivel; os candidatos
-  // trazem a posicao absoluta no documento. A rolagem e a diferenca.
   const scroll: number[] = await page.evaluate('[window.scrollX, window.scrollY]');
   const alvoX = box.x + (scroll?.[0] || 0);
   const alvoY = box.y + (scroll?.[1] || 0);
@@ -124,14 +112,6 @@ export async function describeSelector(
   return menor <= 4 ? melhor : null;
 }
 
-
-/**
- * Descreve o elemento de um Locator, e nao de uma string de seletor.
- *
- * Necessario para os localizadores semanticos (getByRole e afins), em que nao
- * existe seletor CSS para passar a page.$(). A correspondencia com o candidato
- * e feita pela posicao, do mesmo modo que em describeSelector.
- */
 export async function describeLocator(
   page: any, locator: any,
 ): Promise<Descriptor | null> {

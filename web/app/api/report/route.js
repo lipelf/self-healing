@@ -1,7 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-// Expoe o relatorio gerado pelo engine para o painel de revisao.
 export const dynamic = 'force-dynamic';
 
 export async function GET() {

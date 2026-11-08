@@ -7,8 +7,9 @@ from .descriptor import ElementDescriptor, WEIGHTS, PROPERTIES
 from .knowledge import KnowledgeBase
 from .report import Report, HealRecord
 from .rewriter import build_selector, rewrite_selector, find_occurrences
+from .confianca import Confianca
 from .similo import (similarity, locate, rank_candidates, breakdown,
-                     text_similarity, ambiguity_margin)
+                     text_similarity, ambiguity_margin, sinais_de_decisao)
 
 MODE_SUGGEST = "suggest"
 MODE_AUTOFIX = "auto-fix"
@@ -35,5 +36,5 @@ __all__ = [
     "KnowledgeBase", "Report", "HealRecord",
     "build_selector", "rewrite_selector", "find_occurrences",
     "similarity", "locate", "rank_candidates", "breakdown", "text_similarity",
-    "ambiguity_margin",
+    "ambiguity_margin", "sinais_de_decisao", "Confianca",
 ]

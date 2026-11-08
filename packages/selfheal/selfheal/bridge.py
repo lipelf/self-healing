@@ -25,7 +25,8 @@ from .rewriter import (build_selector, find_occurrences, rewrite_selector,
                        localizar_no_projeto, reescrever_no_projeto,
                        partes_da_chave, localizar_semantico,
                        reescrever_semantico)
-from .similo import breakdown, rank_candidates
+from .confianca import Confianca
+from .similo import breakdown, rank_candidates, sinais_de_decisao
 
 DEFAULT_THRESHOLD = 0.50
 DEFAULT_MARGIN = 0.005
@@ -34,10 +35,14 @@ DEFAULT_MARGIN = 0.005
 class Bridge:
     def __init__(self, knowledge_path: str = ".selfheal/knowledge.json",
                  threshold: float = DEFAULT_THRESHOLD,
-                 margin: float = DEFAULT_MARGIN):
+                 margin: float = DEFAULT_MARGIN,
+                 confianca: str = ""):
         self.kb = KnowledgeBase(knowledge_path)
         self.threshold = threshold
         self.margin = margin
+        # Sem arquivo de modelo, a decisao segue pela margem fixa, que e o
+        # padrao da ferramenta e nao depende de dados rotulados do projeto.
+        self.confianca = Confianca.carregar(confianca) if confianca else None
         self.fixes: List[Dict[str, Any]] = []
 
     def cmd_remember(self, req: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,13 +83,25 @@ class Bridge:
         threshold = req.get("threshold", self.threshold)
         min_margin = req.get("margin", self.margin)
 
+        confianca = None
+        if self.confianca is not None:
+            sinais = sinais_de_decisao(target, ranked, len(candidates), threshold)
+            confianca = self.confianca.probabilidade(sinais)
+
         elapsed = (time.perf_counter() - started) * 1000
 
-        if score < threshold:
+        if confianca is not None:
+            if confianca < self.confianca.corte:
+                return {"ok": True, "healed": False, "reason": "confianca-baixa",
+                        "selector": selector, "score": round(score, 4),
+                        "margin": round(margin, 4),
+                        "confianca": round(confianca, 4),
+                        "duration_ms": round(elapsed, 2)}
+        elif score < threshold:
             return {"ok": True, "healed": False, "reason": "abaixo-do-limiar",
                     "selector": selector, "score": round(score, 4),
                     "duration_ms": round(elapsed, 2)}
-        if margin < min_margin:
+        elif margin < min_margin:
             return {"ok": True, "healed": False, "reason": "ambiguo",
                     "selector": selector, "score": round(score, 4),
                     "margin": round(margin, 4), "duration_ms": round(elapsed, 2)}
@@ -95,6 +112,7 @@ class Bridge:
             "selector": selector, "new_selector": novo,
             "score": round(score, 4), "margin": round(margin, 4),
             "breakdown": breakdown(target, best, WEIGHTS),
+            **({"confianca": round(confianca, 4)} if confianca is not None else {}),
             "element": {"tag": best.tag, "id": best.id, "name": best.name,
                         "text": best.visible_text, "class": best.class_},
             "duration_ms": round(elapsed, 2),
@@ -243,9 +261,12 @@ def main(argv=None) -> int:
     parser.add_argument("--knowledge", default=".selfheal/knowledge.json")
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
     parser.add_argument("--margin", type=float, default=DEFAULT_MARGIN)
+    parser.add_argument("--confianca", default="",
+                        help="modelo de rejeicao aprendida (JSON); sem ele, "
+                             "a decisao usa a margem fixa")
     args = parser.parse_args(argv)
 
-    bridge = Bridge(args.knowledge, args.threshold, args.margin)
+    bridge = Bridge(args.knowledge, args.threshold, args.margin, args.confianca)
     handlers = {name[4:]: getattr(bridge, name)
                 for name in dir(bridge) if name.startswith("cmd_")}
 

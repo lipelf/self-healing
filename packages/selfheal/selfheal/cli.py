@@ -65,7 +65,8 @@ def cmd_bridge(args) -> None:
     from .bridge import main as bridge_main
     bridge_main(["--knowledge", args.knowledge,
                  "--threshold", str(args.threshold),
-                 "--margin", str(args.margin)])
+                 "--margin", str(args.margin),
+                 "--confianca", args.confianca])
 
 
 def cmd_knowledge(args) -> None:
@@ -315,6 +316,8 @@ def main(argv=None) -> int:
     p.add_argument("--knowledge", default=".selfheal/knowledge.json")
     p.add_argument("--threshold", type=float, default=0.50)
     p.add_argument("--margin", type=float, default=0.005)
+    p.add_argument("--confianca", default="",
+                   help="modelo de rejeicao aprendida (JSON)")
     p.set_defaults(func=cmd_bridge)
 
     p = sub.add_parser("knowledge", help="lista a base de conhecimento")

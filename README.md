@@ -452,6 +452,81 @@ esforço residual sobre 129 casos permanece.
 
 ---
 
+### 5.8 Rejeição aprendida contra margem fixa
+
+```bash
+make rejeicao              # piso de precisão 99,5%
+make rejeicao PISO=0.95    # outro piso
+```
+
+Os dois valores de 6.1, o limiar e a margem, são globais: decidem igualmente
+sobre um campo de login e sobre uma miniatura, embora a tabela de 5.4 mostre
+que os dois não se comportam nada parecido. A limitação é de representação, e
+não de calibração, porque nenhum par de números distingue situações cuja
+confiabilidade depende do contexto.
+
+Para medir o alcance disso, os dois testes foram substituídos por uma
+regressão logística que estima a probabilidade de o primeiro colocado estar
+correto, a partir de treze sinais disponíveis no instante da decisão: as
+pontuações dos três primeiros, as distâncias entre eles, a quantidade de
+candidatos, quantos passaram do limiar e a similaridade individual de cada uma
+das seis propriedades do primeiro colocado. É esse último grupo que um par de
+números não consegue expressar, pois informa **qual** evidência sustenta a
+escolha.
+
+| Validação | Recuperação | Precisão |
+|---|---|---|
+| Agrupada por elemento | 82,1% | 99,5% |
+| Deixando um cenário de fora | 78,2% | 99,0% |
+| Deixando um tipo de elemento de fora | 46,8% | 93,7% |
+| **margem fixa, nas três** | **74,4%** | **99,5%** |
+
+Com a precisão igualada à da configuração adotada, a rejeição aprendida
+recupera **7,7 pontos a mais**. O ganho não se transfere:
+
+- treinada em C1, C2 e C3 e avaliada em C4, recupera 15,9% contra os 38,1% da
+  margem fixa, porque nunca viu um caso sem âncora alguma;
+- treinada sem o catálogo e avaliada nele, cai a 3,2% contra 77,0%.
+
+A margem fixa não sofre nenhuma dessas quedas, porque não depende de ter visto
+o caso antes. **Por isso ela continua sendo o padrão da ferramenta**: um
+projeto onde o selfheal acaba de ser instalado está exatamente na terceira
+linha da tabela, sem nenhum caso rotulado próprio, e é nela que o modelo fica
+27,6 pontos atrás. A rejeição aprendida é uma oportunidade condicionada ao
+acúmulo de histórico, não uma substituição.
+
+Três cuidados sustentam esses números, e os dois primeiros são onde avaliações
+desse tipo costumam falhar sem avisar:
+
+**Validação agrupada.** Cada elemento aparece oito vezes no experimento, uma
+por cenário e densidade. Uma divisão aleatória o colocaria no treino e no teste
+ao mesmo tempo, o modelo decoraria aquele elemento e o número sairia inflado.
+
+**Padronização e ponto de operação calculados só no treino.** A média e o
+desvio de cada sinal, e o corte de probabilidade, saem apenas da parcela de
+treino de cada dobra, nunca do conjunto inteiro.
+
+**Um único trecho de código calcula os sinais.** A função `sinais_de_decisao`
+em [similo.py](packages/selfheal/selfheal/similo.py) é usada no treinamento e
+de novo na decisão em tempo de execução. Se o vetor fosse montado duas vezes,
+qualquer divergência entre as duas versões degradaria o modelo sem produzir
+erro algum.
+
+A regressão logística é implementada em Python puro de propósito. O engine é
+distribuído como binário e a decisão em tempo de execução precisa de um produto
+escalar e uma função logística; carregar scikit-learn, scipy e numpy para isso
+multiplicaria o tamanho do pacote sem mudar o resultado. O treinamento roda
+offline em [rejeicao.py](experiment/rejeicao.py) e o que viaja para o engine
+são os coeficientes, em `.selfheal/rejeicao.json`.
+
+Para usar o modelo em lugar da margem fixa:
+
+```bash
+selfheal bridge --confianca .selfheal/rejeicao.json
+```
+
+Sem esse argumento, a decisão segue pela margem fixa, que é o padrão.
+
 ## 6. Como o algoritmo decide
 
 O Similo trata a localização como um problema de comparação. Durante cada
@@ -483,8 +558,10 @@ passos de 0,05, depois δ em 0; 0,005; 0,010; 0,020; 0,030 e 0,050. O critério
 de decisão foi a maior taxa de recuperação entre as combinações capazes de
 manter a precisão acima de 95%.
 
-Esses são os valores padrão do adaptador. Para experimentar outros, sem
-recompilar nada, declare-os no `use` do `playwright.config.ts`:
+Esses são os valores padrão do adaptador, e os dois são o caminho padrão de
+decisão da ferramenta; 5.8 descreve a alternativa aprendida e por que ela não
+substituiu este critério. Para experimentar outros valores, sem recompilar
+nada, declare-os no `use` do `playwright.config.ts`:
 
 ```ts
 use: { selfheal: { threshold: 0.50, margin: 0.005, autoRetry: true } }
@@ -600,6 +677,7 @@ Com `make dev` em outro terminal:
 make experimento      # ~4 min: 4 cenários × 2 densidades = 504 seletores
 make tabelas          # as tabelas do TCC, em LaTeX
 make experimento-11   # a comparação com as 11 propriedades originais
+make rejeicao         # treina e valida a rejeição aprendida
 ```
 
 O harness aplica os cenários diretamente sobre a aplicação, sem passar pela
@@ -634,6 +712,7 @@ self-healing/
 │   └── selfheal/
 │       ├── descriptor.py        as 6 propriedades, os pesos e o vetor original de 11
 │       ├── similo.py            S(c,t), Levenshtein e a rejeição por ambiguidade
+│       ├── confianca.py         rejeição aprendida: produto escalar + logística
 │       ├── engine.py            orquestra recuperação e reescrita
 │       ├── rewriter.py          encontra e substitui o seletor nos arquivos-fonte
 │       ├── knowledge.py         base de conhecimento (JSON) dos casos retidos
@@ -666,7 +745,8 @@ self-healing/
 │
 ├── experiment/                  EXPERIMENTO CONTROLADO
 │   ├── harness.py               aplica os 4 cenários × 2 densidades
-│   └── tabelas.py               emite as tabelas do artigo em LaTeX
+│   ├── tabelas.py               emite as tabelas do artigo em LaTeX
+│   └── rejeicao.py              treina e valida a rejeição aprendida
 │
 └── .selfheal/                   SAÍDAS (geradas; não versionadas)
     ├── knowledge.json           os casos retidos: e ENTRADA, nao saida
@@ -759,6 +839,19 @@ caso armazenado com que compará-lo.
 **Tempo da correção manual.** Os 4,2 minutos foram medidos com o próprio autor
 executando as correções, e devem ser lidos como ordem de grandeza.
 
+**O limiar e a margem foram calibrados nos mesmos 504 casos depois reportados.**
+Não houve conjunto de teste separado. É um escalar e um par escolhidos em grade
+grossa, por um critério declarado antes de olhar o resultado, o que limita o
+ajuste, mas o desenho correto teria sido reservar uma parcela para validação. A
+avaliação da rejeição aprendida em 5.8, que exigiu validação cruzada agrupada,
+supre essa falta para a decisão de aceitar ou abster-se, embora não para a
+escolha dos dois valores em si.
+
+**A rejeição aprendida não generaliza para o que não viu.** Ela ganha 7,7 pontos
+onde há dados rotulados representativos e perde 27,6 onde não há, o que é
+exatamente a situação de um projeto recém-instalado. É a razão de a margem fixa
+seguir como padrão, e de o modelo ser uma opção explícita.
+
 ### O que resolveria o pior caso
 
 As abstenções se concentraram em controles sem texto visível. Para eles, a
@@ -789,6 +882,7 @@ deixa de ser irmão do controle, e uma leitura que subisse alguns níveis na
 | Etapa 3, calibração de τ e δ | `experimento.json` → `calibracao` e `calibracao_margem` |
 | Etapa 4, experimento controlado | [`harness.py`](experiment/harness.py) |
 | Comparação 11 × 6 propriedades | `make experimento-11` |
+| Tabela 6, rejeição aprendida | `make rejeicao` |
 | Verificação de ponta a ponta | `make demo` + `.selfheal/report.json` → `suite` |
 | Raciocínio baseado em casos | [`knowledge.py`](packages/selfheal/selfheal/knowledge.py) (retém, recupera) e [`similo.py`](packages/selfheal/selfheal/similo.py) (reutiliza, revisa) |
 

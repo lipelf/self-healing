@@ -111,9 +111,42 @@ def rank_candidates(target: ElementDescriptor, candidates: List[ElementDescripto
     return scored
 
 
+LIMIAR_PADRAO = 0.50
+
+
+def sinais_de_decisao(target: ElementDescriptor,
+                      ranked: List[Tuple[ElementDescriptor, float]],
+                      total_candidatos: int,
+                      limiar: float = LIMIAR_PADRAO) -> Dict[str, float]:
+    """Sinais disponiveis no instante da decisao, sem conhecer a resposta.
+
+    Usada no treinamento da rejeicao aprendida e, de novo, na decisao em tempo
+    de execucao. E o mesmo codigo nas duas pontas de proposito: se o vetor de
+    atributos fosse montado duas vezes, qualquer divergencia entre as duas
+    versoes degradaria o modelo sem produzir erro algum.
+    """
+    if not ranked:
+        return {}
+    melhor, primeiro = ranked[0]
+    segundo = ranked[1][1] if len(ranked) > 1 else 0.0
+    terceiro = ranked[2][1] if len(ranked) > 2 else 0.0
+    sinais = {
+        "primeiro": round(primeiro, 6),
+        "segundo": round(segundo, 6),
+        "terceiro": round(terceiro, 6),
+        "distancia_1_2": round(primeiro - segundo, 6),
+        "distancia_2_3": round(segundo - terceiro, 6),
+        "candidatos": float(total_candidatos),
+        "acima_do_limiar": float(sum(1 for _, v in ranked if v >= limiar)),
+    }
+    for prop, valor in breakdown(target, melhor).items():
+        sinais[f"sim_{prop}"] = round(valor, 6)
+    return sinais
+
+
 def locate(target: ElementDescriptor, candidates: List[ElementDescriptor],
            threshold: float = 0.50, weights: Optional[Dict[str, float]] = None,
-           margin: float = 0.005
+           margin: float = 0.005, confianca=None
            ) -> Tuple[Optional[ElementDescriptor], float]:
     """Melhor candidato, aplicando limiar e rejeicao por ambiguidade.
 
@@ -126,12 +159,20 @@ def locate(target: ElementDescriptor, candidates: List[ElementDescriptor],
 
     Essa rejeicao e a extensao proposta sobre o Similo original e responde
     diretamente aos falsos positivos relatados por Kluge e Stocco (2025).
+
+    Com `confianca`, os dois testes dao lugar a um modelo que estima a
+    probabilidade de o primeiro colocado estar correto. A margem fixa segue
+    sendo o padrao porque nao depende de dados rotulados do projeto onde a
+    ferramenta e instalada; ver experiment/rejeicao.py.
     """
     if not candidates:
         return None, 0.0
     ranked = rank_candidates(target, candidates, weights)
     best, score = ranked[0]
     runner_up = ranked[1][1] if len(ranked) > 1 else 0.0
+    if confianca is not None:
+        sinais = sinais_de_decisao(target, ranked, len(candidates), threshold)
+        return (best, score) if confianca.aceita(sinais) else (None, score)
     if score < threshold:
         return None, score
     if (score - runner_up) < margin:

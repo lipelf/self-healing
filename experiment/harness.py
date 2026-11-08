@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 from selfheal.descriptor import WEIGHTS, PESOS_SIMILO_ORIGINAL
 from selfheal.extractor import collect_from_page
 from selfheal.knowledge import KnowledgeBase
-from selfheal.similo import locate, rank_candidates
+from selfheal.similo import locate, rank_candidates, sinais_de_decisao
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"
@@ -202,6 +202,9 @@ def run_scenario(page, scenario: str, kb: KnowledgeBase,
                 "expected_id": info["mutated"]["id"],
                 "chosen_id": best.id if best else None,
                 "chosen_text": best.visible_text if best else None,
+                # Sinais disponiveis no momento da decisao, usados para
+                # treinar a rejeicao aprendida. Nenhum deles revela o rotulo.
+                "sinais": sinais_de_decisao(target, ranked, len(candidates)),
             })
     return results
 

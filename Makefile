@@ -6,7 +6,7 @@ PYTHON := $(shell command -v python3.13 2>/dev/null || command -v python3)
 PIP := $(PYTHON) -m pip
 RUN := PYTHONPATH=packages/selfheal $(PYTHON)
 
-.PHONY: help checar setup deps dev test ui relatorio-e2e demo quebrar experimento experimento-11 tabelas relatorio painel restaurar limpar
+.PHONY: help checar setup deps dev test ui relatorio-e2e demo quebrar experimento experimento-11 tabelas rejeicao relatorio painel restaurar limpar
 
 help:
 	@echo ""
@@ -24,6 +24,7 @@ help:
 	@echo "  5) make experimento  roda os 4 cenarios e gera as metricas"
 	@echo "     make tabelas     imprime as tabelas do TCC em LaTeX"
 	@echo "     make experimento-11  repete com as 11 propriedades do Similo original"
+	@echo "     make rejeicao    treina e valida a rejeicao aprendida (PISO=0.995)"
 	@echo "  6) make relatorio    mostra o relatorio no terminal"
 	@echo "     make painel       abre o painel de revisao no navegador"
 	@echo "     make restaurar    volta tudo ao estado inicial (repetir a demo)"
@@ -139,6 +140,9 @@ experimento-11:
 
 tabelas:
 	@$(RUN) experiment/tabelas.py
+
+rejeicao:
+	@$(RUN) experiment/rejeicao.py $(or $(PISO),0.995)
 
 relatorio:
 	$(RUN) -m selfheal.cli report --report .selfheal/report.json

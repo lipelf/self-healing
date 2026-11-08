@@ -11,6 +11,10 @@ desenvolvimento de um protótipo de self-healing* (Ciência da Computação,
 Unesc). Todos os números citados neste documento são reproduzíveis pelos
 comandos indicados ao lado de cada um.
 
+Se termos como pontuação, limiar e margem forem novos para você, comece pela
+[seção 5.0](#50-antes-das-tabelas-o-que-cada-termo-quer-dizer), que explica
+cada um com um exemplo real.
+
 ---
 
 ## Índice
@@ -57,30 +61,122 @@ errado, mascarando defeitos reais.
 
 ## 2. O que instalar
 
-**Pré-requisitos.** Python 3.9 ou superior, Node.js 18 ou superior e Git. O
-Chromium é baixado pelo próprio Playwright, não precisa estar instalado. Não há
-banco de dados, serviço externo, chave de API nem acesso à internet durante a
-execução: o engine decide localmente.
+### 2.1 Pré-requisitos
+
+Quatro programas precisam existir na máquina antes de tudo. Confira cada um no
+terminal:
+
+| Programa | Versão mínima | Para conferir | Onde baixar |
+|---|---|---|---|
+| Git | qualquer | `git --version` | <https://git-scm.com> |
+| Python | 3.9 | `python3 --version` | <https://www.python.org/downloads> |
+| Node.js (traz o npm) | 18 | `node --version` | <https://nodejs.org> |
+| make | qualquer | `make --version` | já vem no macOS e no Linux; veja 2.4 para Windows |
+
+No macOS, se `git` ou `make` não existirem, este comando instala os dois:
 
 ```bash
+xcode-select --install
+```
+
+O Chromium não precisa estar instalado: o próprio Playwright baixa a versão
+dele durante a instalação. Não há banco de dados, serviço externo nem chave de
+API, e depois de instalado nada precisa de internet: o engine decide
+localmente.
+
+### 2.2 Baixar o projeto
+
+```bash
+git clone https://github.com/lipelf/self-healing.git
 cd self-healing
-make checar      # mostra as versões de Python, pip, Node e npm
+```
+
+**Todos os comandos `make` deste documento são executados dentro da pasta
+`self-healing`**, a raiz do repositório, onde fica o `Makefile`. Você nunca
+precisa entrar nas subpastas para rodar a demonstração.
+
+### 2.3 Instalar as dependências
+
+```bash
+make checar      # mostra as versões encontradas de Python, pip, Node e npm
 make setup       # instala tudo; só precisa ser feito uma vez
 ```
 
-O `make setup` executa cinco passos, nesta ordem:
+O `make setup` leva alguns minutos, a maior parte baixando pacotes npm e o
+Chromium. Ele executa cinco passos, cada um em uma pasta:
 
-| Passo | O que faz |
-|---|---|
-| 1 | instala a biblioteca Python `selfheal` em modo editável |
-| 2 | baixa o Chromium usado pelo harness do experimento |
-| 3 | instala as dependências da aplicação de demonstração (Next.js) |
-| 4 | compila o adaptador TypeScript e o empacota como `.tgz` |
-| 5 | instala a suíte de testes e o adaptador dentro dela |
+| Passo | Pasta | O que faz |
+|---|---|---|
+| 1 | `packages/selfheal` | instala o engine Python em modo editável |
+| 2 | raiz | baixa o Chromium usado pelo harness do experimento |
+| 3 | `web` | instala as dependências da loja de demonstração (Next.js) |
+| 4 | `packages/selfheal-playwright` | compila o adaptador TypeScript e o empacota como `.tgz` |
+| 5 | `e2e` | instala a suíte de testes, o adaptador dentro dela e o Chromium dela |
 
 Se algo já estiver instalado, `make deps` instala apenas o que falta. Todo
 comando de execução depende de `deps`, então não é possível rodar a
 demonstração com o ambiente incompleto.
+
+### 2.4 Sem `make`: os mesmos passos à mão
+
+Para quem não tem `make`, como no Windows sem WSL, estes são exatamente os
+comandos que o `make setup` executa. Rode-os na ordem, a partir da raiz do
+repositório:
+
+```bash
+# 1. engine Python
+python3 -m pip install --user -e packages/selfheal
+
+# 2. Chromium do harness
+python3 -m playwright install chromium
+
+# 3. loja de demonstração
+cd web
+npm install
+cd ..
+
+# 4. adaptador npm: compila e empacota
+cd packages/selfheal-playwright
+npm install
+npx tsc
+npm pack
+cd ../..
+
+# 5. suíte de testes, com o adaptador recém-empacotado
+cd e2e
+npm install
+npm install --no-save --no-package-lock ../packages/selfheal-playwright/selfheal-playwright-0.1.0.tgz
+npx playwright install chromium
+cd ..
+```
+
+No Windows, troque `python3` por `python`. E os comandos de execução também
+mudam, porque cada alvo do `Makefile` é um atalho:
+
+| Em vez de | Rode |
+|---|---|
+| `make dev` | `cd web` e `npm run dev` |
+| `make test` | `cd e2e` e `npx playwright test` |
+| `make quebrar CENARIO=c1` | `cd web` e `node scripts/apply-variant.mjs c1 4` |
+| `make restaurar` | `cd web` e `node scripts/apply-variant.mjs base 4`, depois copie `e2e/tests.orig` sobre `e2e/tests` e `e2e/pages.orig` sobre `e2e/pages` |
+| `make experimento` | `PYTHONPATH=packages/selfheal python3 experiment/harness.py` |
+
+### 2.5 Se o passo 1 falhar
+
+Em Python instalado pelo Homebrew, o `pip` pode recusar a instalação com a
+mensagem `externally-managed-environment`. Nesse caso, crie um ambiente virtual
+na raiz do repositório e instale o engine nele:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate          # no Windows: .venv\Scripts\activate
+pip install -e packages/selfheal
+python -m playwright install chromium
+```
+
+Com o ambiente ativo, siga os passos 3 a 5 de 2.4 normalmente. Lembre de ativá-lo
+(`source .venv/bin/activate`) sempre que abrir um terminal novo para rodar o
+projeto.
 
 ---
 
@@ -293,6 +389,97 @@ alguém transcrever número a número de um JSON.
 ## 5. Resultados medidos: todas as tabelas
 
 Reproduza qualquer uma com `make experimento && make tabelas`.
+
+### 5.0 Antes das tabelas: o que cada termo quer dizer
+
+As tabelas usam seis termos: propriedade, peso, pontuação, limiar, margem e
+abstenção, além das duas métricas, recuperação e precisão. Abaixo, cada um com
+um caso real do experimento: o campo de e-mail do login, que se chamava
+`#login-email` e, no cenário C1, foi renomeado para `#elxdjwv`.
+
+**Propriedade.** Uma característica do elemento que a ferramenta memoriza
+enquanto o teste funciona: o texto que aparece na tela, o texto dos elementos
+ao lado, o `id`, o `name`, a classe CSS e o caminho na árvore da página (xpath).
+São seis ao todo.
+
+**Peso.** O quanto cada propriedade conta na comparação. As que costumam
+sobreviver a uma mudança de interface (texto visível, texto dos vizinhos, `id`
+e `name`) valem 1,5. As que mudam a qualquer ajuste de layout (classe CSS e
+xpath) valem 0,5.
+
+**Pontuação, ou similaridade.** Quando um seletor quebra, a ferramenta compara
+o elemento memorizado com cada elemento da página nova e dá a cada um uma nota
+de 0 a 1. Cada propriedade igual soma o seu peso, cada propriedade diferente
+soma zero, e o total é dividido pela soma de todos os pesos, que é 7.
+
+No caso do e-mail, só o `id` mudou:
+
+| Propriedade | Peso | Antes e depois | Conta |
+|---|---|---|---|
+| texto visível | 1,5 | igual | 1,5 |
+| texto dos vizinhos | 1,5 | igual | 1,5 |
+| `id` | 1,5 | `login-email` → `elxdjwv` | **0** |
+| `name` | 1,5 | igual | 1,5 |
+| classe CSS | 0,5 | igual | 0,5 |
+| xpath | 0,5 | igual | 0,5 |
+| **total** | **7** | | **5,5** |
+
+```
+pontuação = 5,5 / 7 = 0,786
+```
+
+É exatamente o `0.786` que aparece no relatório para esse seletor. O
+identificador mudou, mas as outras cinco características continuaram iguais,
+então a nota ficou alta. É como reconhecer alguém que cortou o cabelo: o rosto,
+a voz e o jeito continuam, e você reconhece.
+
+Na prática a comparação não é só "igual ou diferente": textos parecidos ganham
+nota parcial, medida pela distância de Levenshtein, que conta quantas letras
+precisam ser trocadas para ir de um texto ao outro.
+
+**Limiar (τ = 0,50).** A nota mínima para a ferramenta aceitar um candidato.
+Se nem o melhor elemento da página chega a 0,50, ela entende que nada ali se
+parece o bastante com o que sumiu.
+
+**Margem (δ = 0,005).** A distância mínima entre o primeiro e o segundo
+colocado. É a contribuição deste trabalho. Não basta o primeiro ter nota alta:
+ele precisa estar na frente do segundo.
+
+O motivo são casos como as miniaturas da galeria: oito botões sem texto, com a
+mesma classe. Se um deles sumiu, os oito tiram a mesma nota, digamos 0,714. A
+nota passa do limiar, mas não há como saber qual dos oito é o certo, e escolher
+um seria chute. A regra completa fica assim:
+
+```
+corrige  se  pontuação do 1º ≥ 0,50  E  (pontuação do 1º − pontuação do 2º) ≥ 0,005
+abstém   em qualquer outro caso
+```
+
+**Abstenção.** Quando a ferramenta não corrige. Ela não tenta adivinhar: deixa
+o teste vermelho e lista o seletor com arquivo, linha e motivo, para alguém
+olhar.
+
+**Taxa de recuperação.** De tudo que quebrou, quanto foi consertado
+corretamente. No experimento, 504 seletores quebraram e 375 foram consertados
+certo:
+
+```
+recuperação = 375 / 504 = 74,4%
+```
+
+**Precisão.** De tudo que a ferramenta mexeu, quanto estava certo. Ela tentou
+corrigir 377 e acertou 375, errando só 2:
+
+```
+precisão = 375 / 377 = 99,5%
+```
+
+**Por que as duas métricas brigam.** Sem a margem, a ferramenta corrigiria mais
+(recuperação de 84,1%), mas erraria 16 vezes em vez de 2. E errar é pior do que
+não corrigir. Se ela não corrige, o teste continua vermelho e alguém percebe. Se
+corrige errado, o teste fica verde testando o botão errado, e um defeito de
+verdade passa sem ninguém ver. Por isso o trabalho prioriza a precisão, mesmo
+perdendo um pouco de recuperação.
 
 ### 5.1 Propriedades comparadas e seus pesos
 
